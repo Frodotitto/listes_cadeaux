@@ -1,1 +1,31 @@
-
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: system-ui, sans-serif; width: 300px; padding: 12px; margin: 0; background: #f8fafc; }
+    h3 { margin: 0 0 10px; font-size: 14px; color: #4f46e5; text-align: center; }
+    .form-group { margin-bottom: 8px; }
+    label { display: block; font-size: 10px; font-weight: bold; color: #64748b; margin-bottom: 2px; }
+    input, select { width: 100%; box-sizing: border-box; padding: 6px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; background: white; }
+    button { width: 100%; padding: 8px; background: #059669; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 6px; }
+    button:hover { background: #047857; }
+    #status { font-size: 11px; text-align: center; margin-top: 6px; color: #4f46e5; }
+  </style>
+</head>
+<body>
+  <h3>Ajouter à MesEnvies 🎁</h3>
+  <div class="form-group">
+    <label>Liste :</label>
+    <select id="listSelect"><option value="">Chargement...</option></select>
+  </div>
+  <div class="form-group"><label>Titre :</label><input type="text" id="title"></div>
+  <div class="form-group"><label>Prix :</label><input type="text" id="price"></div>
+  <div class="form-group"><label>Marchand :</label><input type="text" id="store"></div>
+  <div class="form-group"><label>Image URL :</label><input type="text" id="image"></div>
+  <input type="hidden" id="url">
+  <button id="saveBtn">💾 Enregistrer l'article</button>
+  <p id="status">Extraction des infos...</p>
+  <script src="popup.js"></script>
+</body>
+</html>
