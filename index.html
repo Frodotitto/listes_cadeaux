@@ -9,11 +9,17 @@
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans min-h-screen p-4 md:p-8">
 
-  <!-- Authentification -->
+  <!-- Modal de mot de passe -->
   <div id="authModal" class="fixed inset-0 bg-slate-900 bg-opacity-80 flex items-center justify-center z-50">
     <div class="bg-white p-6 rounded-xl shadow-xl max-w-sm w-full text-center">
       <h2 class="text-xl font-bold mb-4">🔒 Accès Restreint</h2>
-      <input type="password" id="passInput" class="w-full p-2 border rounded-lg mb-4 text-center" placeholder="Code d'accès">
+      <input 
+        type="password" 
+        id="passInput" 
+        class="w-full p-2 border rounded-lg mb-4 text-center" 
+        placeholder="Code d'accès"
+        onkeyup="if(event.key === 'Enter') checkAccess()"
+      >
       <button onclick="checkAccess()" class="w-full bg-indigo-600 text-white py-2 rounded-lg font-medium hover:bg-indigo-700">Entrer</button>
       <p id="authError" class="text-red-500 text-xs mt-2 hidden">Code incorrect</p>
     </div>
@@ -42,7 +48,7 @@
           <label class="block text-xs font-semibold text-slate-500 mb-1">URL du produit :</label>
           <div class="flex gap-2">
             <input type="url" id="productUrl" placeholder="https://..." class="flex-1 p-2 border rounded-lg text-sm">
-            <button onclick="autoFillFromUrl()" class="bg-indigo-100 text-indigo-700 px-3 py-2 rounded-lg text-xs font-bold hover:bg-indigo-200">🔍 Detecter</button>
+            <button onclick="autoFillFromUrl()" class="bg-indigo-100 text-indigo-700 px-3 py-2 rounded-lg text-xs font-bold hover:bg-indigo-200">🔍 Détecter</button>
           </div>
         </div>
       </div>
@@ -68,7 +74,7 @@
   </main>
 
   <script>
-    // ⚠️ Remplace avec tes identifiants Supabase
+    // ⚠️ N'oublie pas de remplacer avec tes clés Supabase
     const SUPABASE_URL = 'https://glufuwoyxbyljnnthmbq.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdsdWZ1d295eGJ5bGpubnRobWJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3MTg4MjUsImV4cCI6MjEwNzI5NDgyNX0.Zi64NJ2qr07oZMCA8acwmD8f1fEP6NJN_DyO5IvrIUc';
     const ACCESS_CODE = 'Xv7QNTBPgaRcODMt'; // Mot de passe du site
@@ -79,7 +85,8 @@
     let allLists = [];
 
     function checkAccess() {
-      if (document.getElementById('passInput').value === ACCESS_CODE) {
+      const input = document.getElementById('passInput').value;
+      if (input === ACCESS_CODE) {
         document.getElementById('authModal').classList.add('hidden');
         document.getElementById('appContent').classList.remove('opacity-10', 'pointer-events-none');
         initApp();
@@ -136,7 +143,7 @@
       if (!name) return;
       const { data } = await supabase.from('lists').insert([{ name }]).select();
       await loadLists();
-      if (data?.[0]) selectList(data[0].id);
+      if (data && data[0]) selectList(data[0].id);
     }
 
     async function deleteList(e, id) {
@@ -154,7 +161,8 @@
       select.innerHTML = '';
       allLists.forEach(l => {
         const opt = document.createElement('option');
-        opt.value = l.id; opt.innerText = l.name;
+        opt.value = l.id;
+        opt.innerText = l.name;
         if (l.id === currentListId) opt.selected = true;
         select.appendChild(opt);
       });
@@ -171,9 +179,15 @@
         if (json.status === 'success') {
           const d = json.data;
           document.getElementById('productTitle').value = d.title || '';
-          document.getElementById('productImage').value = d.image?.url || '';
+          document.getElementById('productImage').value = d.image ? d.image.url : '';
           document.getElementById('productStore').value = d.publisher || new URL(url).hostname.replace('www.', '');
-          document.getElementById('productPrice').value = d.description?.match(/(\d+[\.,]?\d*)\s?€/)?0 || 'Voir site';
+          
+          let priceFound = 'Voir site';
+          if (d.description) {
+            const match = d.description.match(/(\d+[\.,]?\d*)\s?€/);
+            if (match) priceFound = match[0];
+          }
+          document.getElementById('productPrice').value = priceFound;
           status.innerText = "✅ Informations extraites !";
         }
       } catch (err) { status.innerText = "❌ Saisie manuelle requise."; }
@@ -183,19 +197,33 @@
       const title = document.getElementById('productTitle').value;
       const url = document.getElementById('productUrl').value;
       const list_id = document.getElementById('formListSelect').value;
-      if (!title || !url || !list_id) return alert("Champs obligatoires manquants.");
 
-      await supabase.from('products').insert([{
-        title, url,
+      if (!title || !url || !list_id) {
+        alert("Champs obligatoires manquants.");
+        return;
+      }
+
+      const { error } = await supabase.from('products').insert([{
+        title: title,
+        url: url,
         image_url: document.getElementById('productImage').value || 'https://via.placeholder.com/300',
         store_name: document.getElementById('productStore').value || 'Boutique',
         price: document.getElementById('productPrice').value || 'Non renseigné',
-        list_id: parseInt(list_id), is_bought: false
+        list_id: parseInt(list_id),
+        is_bought: false
       }]);
 
-      ['productUrl', 'productTitle', 'productPrice', 'productStore', 'productImage'].forEach(id => document.getElementById(id).value = '');
-      document.getElementById('fetchStatus').innerText = '';
-      selectList(parseInt(list_id));
+      if (error) {
+        alert("Erreur Supabase : " + error.message);
+      } else {
+        const fields = ['productUrl', 'productTitle', 'productPrice', 'productStore', 'productImage'];
+        fields.forEach(function(id) {
+          const el = document.getElementById(id);
+          if (el) el.value = '';
+        });
+        document.getElementById('fetchStatus').innerText = '';
+        selectList(parseInt(list_id));
+      }
     }
 
     async function loadProducts() {
