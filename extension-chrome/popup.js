@@ -42,7 +42,7 @@ async function loadLists() {
   }
 }
 
-// Fonction exécutée directement sur la page du marchand
+// Fonction d'extraction avancée sur la page
 function extractPageMeta() {
   const getMeta = (prop) => 
     document.querySelector(`meta[property="${prop}"]`)?.content || 
@@ -50,49 +50,55 @@ function extractPageMeta() {
 
   const hostname = window.location.hostname;
   let title = getMeta('og:title') || document.title;
-  let image = getMeta('og:image');
+  let image = getMeta('og:image') || '';
   let price = '';
   let store = getMeta('og:site_name') || hostname.replace('www.', '');
 
-  // 1. DÉTECTION SPÉCIFIQUE AMAZON
+  // SPÉCIFIQUE AMAZON
   if (hostname.includes('amazon')) {
     store = 'Amazon.fr';
     
-    // Titre propre Amazon
+    // 1. Extraction du Titre Amazon
     const amazonTitle = document.getElementById('productTitle');
     if (amazonTitle) title = amazonTitle.innerText.trim();
 
-    // Image principale du produit Amazon
-    const landingImage = document.getElementById('landingImage') || document.getElementById('imgBlkFront');
-    if (landingImage) {
-      image = landingImage.getAttribute('data-old-hires') || landingImage.src;
+    // 2. Extraction de l'Image HD Amazon
+    const imgEl = document.getElementById('landingImage') || 
+                  document.getElementById('imgBlkFront') || 
+                  document.querySelector('#main-image-container img') ||
+                  document.querySelector('#imgTagWrapperId img');
+    if (imgEl) {
+      // Priorité aux attributs HD d'Amazon
+      image = imgEl.getAttribute('data-old-hires') || 
+              imgEl.getAttribute('data-dynamic-image') ? Object.keys(JSON.parse(imgEl.getAttribute('data-dynamic-image') || '{}'))[0] : null ||
+              imgEl.src;
     }
 
-    // Prix principal Amazon
-    const priceWhole = document.querySelector('.a-price-whole')?.innerText.replace(/\n|,/g, '').trim();
-    const priceFraction = document.querySelector('.a-price-fraction')?.innerText.trim();
-    if (priceWhole) {
-      price = `${priceWhole}${priceFraction ? ',' + priceFraction : ''} €`;
+    // 3. Extraction du Prix Amazon principal
+    const offscreenPrice = document.querySelector('.apexPriceToPay .a-offscreen') || 
+                           document.querySelector('#corePrice_feature_div .a-offscreen') ||
+                           document.querySelector('.a-price .a-offscreen');
+    if (offscreenPrice) {
+      price = offscreenPrice.innerText.trim();
     } else {
-      const apexPrice = document.querySelector('.apexPriceToPay .a-offscreen') || document.querySelector('#priceblock_ourprice');
-      if (apexPrice) price = apexPrice.innerText.trim();
+      const whole = document.querySelector('.a-price-whole')?.innerText.replace(/[^\d]/g, '');
+      const fraction = document.querySelector('.a-price-fraction')?.innerText.trim();
+      if (whole) price = `${whole}${fraction ? ',' + fraction : ''} €`;
     }
   }
 
-  // 2. DÉTECTION GÉNÉRIQUE SI PAS D'IMAGE OU DE PRIX TROUVÉ
+  // REPLI GÉNÉRIQUE (pour les autres sites e-commerce)
   if (!image) {
-    // Essaie de choper la première grande image de la page
-    const imgs = Array.from(document.querySelectorAll('img')).filter(img => img.width > 200 && img.height > 200);
-    if (imgs.length > 0) image = imgs[0].src;
+    const mainImg = document.querySelector('article img, .product img, main img');
+    if (mainImg) image = mainImg.src;
   }
 
   if (!price) {
-    // Repli sur métadonnées og:price ou recherche regex
     const ogPrice = getMeta('og:price:amount') || getMeta('product:price:amount');
     if (ogPrice) {
       price = ogPrice + ' €';
     } else {
-      const match = document.body.innerText.match(/(\d+[\.,]?\d*)\s?€/);
+      const match = document.body.innerText.match(/(\d+[\.,]\d{2})\s?€/);
       if (match) price = match[0];
     }
   }
