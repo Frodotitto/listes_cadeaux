@@ -9,10 +9,11 @@
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans min-h-screen p-4 md:p-8">
 
-  <!-- Modal de mot de passe -->
+  <!-- Modal de mot de passe du site -->
   <div id="authModal" class="fixed inset-0 bg-slate-900 bg-opacity-80 flex items-center justify-center z-50">
     <div class="bg-white p-6 rounded-xl shadow-xl max-w-sm w-full text-center">
       <h2 class="text-xl font-bold mb-4">🔒 Accès Restreint</h2>
+      <p class="text-xs text-slate-500 mb-4">Entrez le code d'accès pour consulter les listes.</p>
       <input 
         type="password" 
         id="passInput" 
@@ -76,27 +77,55 @@
   <script>
     const SUPABASE_URL = 'https://glufuwoyxbyljnnthmbq.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdsdWZ1d295eGJ5bGpubnRobWJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3MTg4MjUsImV4cCI6MjEwNzI5NDgyNX0.Zi64NJ2qr07oZMCA8acwmD8f1fEP6NJN_DyO5IvrIUc';
-    const ACCESS_CODE = '1234';
+    
+    // Mots de passe
+    const ACCESS_CODE = '1234';  // Mot de passe pour accéder au site
+    const ADMIN_CODE = '5678';   // Mot de passe pour déverrouiller le Mode Créateur
 
-    // Renommage ici pour éviter le conflit de variables
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     let isAdmin = false;
     let currentListId = null;
     let allLists = [];
 
+    // Vérification de la session au chargement de la page
+    window.addEventListener('DOMContentLoaded', () => {
+      if (localStorage.getItem('site_access_granted') === 'true') {
+        unlockSite();
+      }
+    });
+
     function checkAccess() {
       const input = document.getElementById('passInput').value;
       if (input === ACCESS_CODE) {
-        document.getElementById('authModal').classList.add('hidden');
-        document.getElementById('appContent').classList.remove('opacity-10', 'pointer-events-none');
-        initApp();
+        localStorage.setItem('site_access_granted', 'true');
+        unlockSite();
       } else {
         document.getElementById('authError').classList.remove('hidden');
       }
     }
 
+    function unlockSite() {
+      document.getElementById('authModal').classList.add('hidden');
+      document.getElementById('appContent').classList.remove('opacity-10', 'pointer-events-none');
+      initApp();
+    }
+
+    // Bascule en Mode Créateur avec vérification de mot de passe
     function toggleAdmin() {
-      isAdmin = !isAdmin;
+      if (!isAdmin) {
+        const pass = prompt("Entrez le mot de passe Créateur :");
+        if (pass === ADMIN_CODE) {
+          isAdmin = true;
+        } else if (pass !== null) {
+          alert("Mot de passe Créateur incorrect !");
+          return;
+        } else {
+          return; // Annulé
+        }
+      } else {
+        isAdmin = false;
+      }
+
       document.getElementById('adminSection').classList.toggle('hidden', !isAdmin);
       document.getElementById('adminToggleBtn').innerText = isAdmin ? "Quitter Mode Créateur" : "Mode Créateur";
       renderTabs();
