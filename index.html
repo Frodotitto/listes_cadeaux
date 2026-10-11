@@ -78,16 +78,14 @@
     const SUPABASE_URL = 'https://glufuwoyxbyljnnthmbq.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdsdWZ1d295eGJ5bGpubnRobWJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3MTg4MjUsImV4cCI6MjEwNzI5NDgyNX0.Zi64NJ2qr07oZMCA8acwmD8f1fEP6NJN_DyO5IvrIUc';
     
-    // Mots de passe
-    const ACCESS_CODE = '1234';  // Mot de passe pour accéder au site
-    const ADMIN_CODE = '5678';   // Mot de passe pour déverrouiller le Mode Créateur
+    const ACCESS_CODE = '1234';  // Mot de passe visiteurs
+    const ADMIN_CODE = '5678';   // Mot de passe Mode Créateur
 
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     let isAdmin = false;
     let currentListId = null;
     let allLists = [];
 
-    // Vérification de la session au chargement de la page
     window.addEventListener('DOMContentLoaded', () => {
       if (localStorage.getItem('site_access_granted') === 'true') {
         unlockSite();
@@ -110,7 +108,6 @@
       initApp();
     }
 
-    // Bascule en Mode Créateur avec vérification de mot de passe
     function toggleAdmin() {
       if (!isAdmin) {
         const pass = prompt("Entrez le mot de passe Créateur :");
@@ -120,7 +117,7 @@
           alert("Mot de passe Créateur incorrect !");
           return;
         } else {
-          return; // Annulé
+          return;
         }
       } else {
         isAdmin = false;
@@ -198,6 +195,7 @@
       });
     }
 
+    // EXTRACTION DU PRODUIT AVEC EXTRACTION AMÉLIORÉE DU PRIX
     async function autoFillFromUrl() {
       const url = document.getElementById('productUrl').value.trim();
       const status = document.getElementById('fetchStatus');
@@ -212,17 +210,25 @@
           document.getElementById('productImage').value = d.image ? d.image.url : '';
           document.getElementById('productStore').value = d.publisher || new URL(url).hostname.replace('www.', '');
           
-          let priceFound = 'Voir site';
-          if (d.description) {
-            const match = d.description.match(/(\d+[\.,]?\d*)\s?€/);
-            if (match && match[0]) priceFound = match[0];
+          let priceFound = '';
+
+          // Recherche multi-sources dans la réponse Microlink
+          if (d.price && typeof d.price === 'object') {
+            priceFound = `${d.price.amount} €`;
+          } else if (d.price) {
+            priceFound = `${d.price} €`;
+          } else if (d.description) {
+            const match = d.description.match(/(\d+[\.,]\d{2})\s?€/);
+            if (match) priceFound = match[0];
           }
-          document.getElementById('productPrice').value = priceFound;
+
+          document.getElementById('productPrice').value = priceFound || 'Voir site';
           status.innerText = "✅ Informations extraites !";
         }
       } catch (err) { status.innerText = "❌ Saisie manuelle requise."; }
     }
 
+    // SAUVEGARDE AVEC VÉRIFICATION ANTI-DOUBLON
     async function saveProduct() {
       const title = document.getElementById('productTitle').value;
       const url = document.getElementById('productUrl').value;
@@ -233,6 +239,19 @@
         return;
       }
 
+      // 1. Vérification si l'URL existe déjà dans cette liste
+      const { data: existingProducts, error: checkError } = await supabaseClient
+        .from('products')
+        .select('id')
+        .eq('list_id', list_id)
+        .eq('url', url);
+
+      if (existingProducts && existingProducts.length > 0) {
+        alert("⚠️ Cet article existe déjà dans cette liste !");
+        return;
+      }
+
+      // 2. Insertion
       const { error } = await supabaseClient.from('products').insert([{
         title: title,
         url: url,
