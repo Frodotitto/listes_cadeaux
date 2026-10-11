@@ -133,52 +133,48 @@
 
     // 2. INITIALISATION & RECEPTION DES PARAMETRES (iOS / EXTENSION)
     async function initApp() {
-      await loadLists();
+      try { await loadLists(); } catch (e) { console.error(e); }
       if (allLists.length > 0) selectList(allLists[0].id);
     
-      const urlParams = new URLSearchParams(window.location.search);
-      const addUrl = urlParams.get('add_url');
-      const addPrice = urlParams.get('price');
-      const addTitle = urlParams.get('title');
-      const jsDataParam = urlParams.get('js_data'); // Si envoyé en un seul bloc JSON
+      const params = new URLSearchParams(window.location.search);
+      const addUrl = params.get('add_url');
+      if (!addUrl) return;
     
-      if (addUrl) {
-        if (!isAdmin) {
-          document.getElementById('adminSection').classList.remove('hidden');
-        }
+      // URLSearchParams a déjà décodé : surtout pas de decodeURIComponent en plus
+      document.getElementById('adminSection').classList.remove('hidden');
+      document.getElementById('productUrl').value = addUrl;
     
-        const decodedUrl = decodeURIComponent(addUrl);
-        document.getElementById('productUrl').value = decodedUrl;
-    
-        // Décodage si transmis sous forme de bloc JSON (iOS)
-        if (jsDataParam) {
-          try {
-            const parsed = JSON.parse(decodeURIComponent(jsDataParam));
-            if (parsed.price) document.getElementById('productPrice').value = parsed.price;
-            if (parsed.title) document.getElementById('productTitle').value = parsed.title;
-          } catch(e) {}
-        }
-    
-        // Décodage si transmis via des paramètres séparés (&price=...&title=...)
-        if (addPrice && addPrice !== 'null' && addPrice.trim() !== '') {
-          document.getElementById('productPrice').value = decodeURIComponent(addPrice).trim();
-        }
-        if (addTitle && addTitle !== 'null' && addTitle.trim() !== '') {
-          document.getElementById('productTitle').value = decodeURIComponent(addTitle).trim();
-        }
-    
-        // Nom du marchand à partir de l'hôte
+      const jsData = params.get('js_data');
+      if (jsData) {
         try {
-          document.getElementById('productStore').value = new URL(decodedUrl).hostname.replace('www.', '');
-        } catch(e) {}
-    
-        // Si on a déjà récupéré le titre ou le prix depuis Safari iOS, on valide directement
-        if (document.getElementById('productTitle').value || document.getElementById('productPrice').value) {
-          document.getElementById('fetchStatus').innerText = "✅ Infos extraites depuis Safari iOS !";
-        } else {
-          autoFillFromUrl();
+          const parsed = JSON.parse(jsData);
+          if (parsed.price && parsed.price !== 'Non renseigné') {
+            document.getElementById('productPrice').value = parsed.price;
+          }
+          if (parsed.title) {
+            document.getElementById('productTitle').value = parsed.title;
+          }
+        } catch (e) {
+          console.error('js_data invalide', e);
         }
       }
+    
+      // Paramètres séparés (extension PC éventuelle)
+      const price = params.get('price');
+      const title = params.get('title');
+      if (price && price !== 'null' && price.trim()) {
+        document.getElementById('productPrice').value = price.trim();
+      }
+      if (title && title !== 'null' && title.trim()) {
+        document.getElementById('productTitle').value = title.trim();
+      }
+    
+      try {
+        document.getElementById('productStore').value = new URL(addUrl).hostname.replace('www.', '');
+      } catch (e) {}
+    
+      // Complète ce qui manque (image, prix, titre) sans écraser ce qui est rempli
+      autoFillFromUrl();
     }
 
     // 3. CHARGEMENT & GESTION DES LISTES
