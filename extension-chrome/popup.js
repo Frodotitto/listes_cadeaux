@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   chrome.scripting.executeScript({
     target: { tabId: tab.id },
-    func: extractPageMeta,
+    func: extractUniversalMeta,
   }, (results) => {
     if (!results || !results[0]?.result) {
       document.getElementById('status').innerText = "❌ Échec de la lecture de la page.";
@@ -42,96 +42,84 @@ async function loadLists() {
   }
 }
 
-// Fonction d'extraction exécutée dans l'onglet actif
-function extractPageMeta() {
+// STRATÉGIE UNIVERSELLE D'EXTRACTION DE PRIX & INFOS
+function extractUniversalMeta() {
+  let title = '', image = '', price = '', store = '';
+  const hostname = window.location.hostname;
+
   const getMeta = (prop) => 
     document.querySelector(`meta[property="${prop}"]`)?.content || 
     document.querySelector(`meta[name="${prop}"]`)?.content;
 
-  const hostname = window.location.hostname;
-  let title = getMeta('og:title') || document.title;
-  let image = '';
-  let price = '';
-  let store = getMeta('og:site_name') || hostname.replace('www.', '');
+  // -------------------------------------------------------------
+  // STRATÉGIE 1 : DONNÉES STRUCTURÉES JSON-LD (Ultra fiable)
+  // -------------------------------------------------------------
+  const jsonLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
+  for (const script of jsonLdScripts) {
+    try {
+      const data = JSON.parse(script.innerText);
+      const items = Array.isArray(data) ? data : [data];
 
-  // 1. EXTRACTION SPÉCIFIQUE AMAZON
-  if (hostname.includes('amazon')) {
-    store = 'Amazon.fr';
+      for (const item of items) {
+        // Recherche du schéma Product
+        if (item['@type'] === 'Product' || item['@type']?.includes('Product')) {
+          if (!title && item.name) title = item.name;
+          if (!image && item.image) {
+            image = Array.isArray(item.image) ? item.image[0] : item.image;
+            if (typeof image === 'object') image = image.url;
+          }
 
-    // Titre
-    const amazonTitle = document.getElementById('productTitle');
-    if (amazonTitle) title = amazonTitle.innerText.trim();
-
-    // Image (Recherche avancée dans le DOM Amazon)
-    const imgCandidates = [
-      document.getElementById('landingImage'),
-      document.getElementById('imgBlkFront'),
-      document.querySelector('#main-image-container img'),
-      document.querySelector('#imgTagWrapperId img'),
-      document.querySelector('.a-dynamic-image')
-    ];
-
-    for (const img of imgCandidates) {
-      if (img) {
-        const hires = img.getAttribute('data-old-hires');
-        const dynamic = img.getAttribute('data-dynamic-image');
-        
-        if (hires && hires.startsWith('http')) {
-          image = hires;
-          break;
-        } else if (dynamic) {
-          try {
-            const parsed = JSON.parse(dynamic);
-            const keys = Object.keys(parsed);
-            if (keys.length > 0) {
-              image = keys[keys.length - 1]; // Prend la résolution la plus élevée
-              break;
+          if (item.offers) {
+            const offer = Array.isArray(item.offers) ? item.offers[0] : item.offers;
+            const p = offer.price || offer.lowPrice;
+            if (p) {
+              price = `${parseFloat(p).toFixed(2).replace('.', ',')} €`;
             }
-          } catch (e) {}
-        } else if (img.src && img.src.startsWith('http') && !img.src.includes('sprite') && !img.src.includes('transparent-pixel')) {
-          image = img.src;
-          break;
+          }
         }
       }
+    } catch (e) {}
+  }
+
+  // -------------------------------------------------------------
+  // STRATÉGIE 2 : SÉLECTEURS DE SECOURS PAR ENSEIGNE
+  // -------------------------------------------------------------
+  if (hostname.includes('fnac')) {
+    store = 'Fnac';
+    // Prix principal Fnac (évite les mensualités / occasion)
+    const fnacPrice = document.querySelector('.f-priceBox__price') || 
+                      document.querySelector('.f-buyBox-availabilityOffer .price') ||
+                      document.querySelector('.priceText');
+    if (fnacPrice && !price) {
+      price = fnacPrice.innerText.replace(/[^\d,\.]/g, '').trim() + ' €';
     }
+  } else if (hostname.includes('amazon')) {
+    store = 'Amazon.fr';
+    const amazonPrice = document.querySelector('.apexPriceToPay .a-offscreen') || 
+                        document.querySelector('#corePrice_feature_div .a-offscreen');
+    if (amazonPrice) price = amazonPrice.innerText.trim();
 
-    // Prix
-    const offscreenPrice = document.querySelector('.apexPriceToPay .a-offscreen') || 
-                           document.querySelector('#corePrice_feature_div .a-offscreen') ||
-                           document.querySelector('.a-price .a-offscreen');
-    if (offscreenPrice) {
-      price = offscreenPrice.innerText.trim();
-    } else {
-      const whole = document.querySelector('.a-price-whole')?.innerText.replace(/[^\d]/g, '');
-      const fraction = document.querySelector('.a-price-fraction')?.innerText.trim();
-      if (whole) price = `${whole}${fraction ? ',' + fraction : ''} €`;
-    }
+    const amazonImg = document.getElementById('landingImage') || document.getElementById('imgBlkFront');
+    if (amazonImg && !image) image = amazonImg.getAttribute('data-old-hires') || amazonImg.src;
   }
 
-  // 2. REPLI GÉNÉRIQUE POUR LES AUTRES SITES
-  if (!image) {
-    image = getMeta('og:image') || getMeta('twitter:image') || '';
-  }
-
-  if (!image) {
-    const mainImg = document.querySelector('article img, .product img, main img');
-    if (mainImg && mainImg.src.startsWith('http')) image = mainImg.src;
-  }
+  // -------------------------------------------------------------
+  // STRATÉGIE 3 : MÉTA-DONNÉES GLOBALES (OpenGraph)
+  // -------------------------------------------------------------
+  if (!title) title = getMeta('og:title') || document.title;
+  if (!image) image = getMeta('og:image') || getMeta('twitter:image') || '';
+  if (!store) store = getMeta('og:site_name') || hostname.replace('www.', '');
 
   if (!price) {
-    const ogPrice = getMeta('og:price:amount') || getMeta('product:price:amount');
-    if (ogPrice) {
-      price = ogPrice + ' €';
-    } else {
-      const match = document.body.innerText.match(/(\d+[\.,]\d{2})\s?€/);
-      if (match) price = match[0];
+    const metaPrice = getMeta('product:price:amount') || getMeta('og:price:amount');
+    if (metaPrice) {
+      price = `${parseFloat(metaPrice).toFixed(2).replace('.', ',')} €`;
     }
   }
 
   return { title, image, store, price };
 }
 
-// Enregistrement avec vérification préalable des doublons
 document.getElementById('saveBtn').addEventListener('click', async () => {
   const status = document.getElementById('status');
   const listId = document.getElementById('listSelect').value;
@@ -139,25 +127,19 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
 
   if (!listId) return status.innerText = "⚠️ Choisis une liste.";
 
-  status.innerText = "⏳ Vérification du doublon...";
+  status.innerText = "⏳ Vérification doublon...";
 
   try {
-    // 1. Vérification si l'URL existe déjà dans cette liste
     const checkRes = await fetch(`${SUPABASE_URL}/rest/v1/products?list_id=eq.${listId}&url=eq.${encodeURIComponent(url)}&select=id`, {
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`
-      }
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
     });
-
     const existingProducts = await checkRes.json();
 
     if (existingProducts && existingProducts.length > 0) {
-      status.innerText = "⚠️ Cet article est déjà présent dans cette liste !";
+      status.innerText = "⚠️ Cet article est déjà dans la liste !";
       return;
     }
 
-    // 2. Insertion si pas de doublon
     status.innerText = "⏳ Enregistrement...";
     const payload = {
       title: document.getElementById('title').value,
@@ -183,10 +165,8 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     if (res.ok) {
       status.innerText = "🎉 Ajouté à la liste !";
       setTimeout(() => window.close(), 1200);
-    } else {
-      throw new Error("Erreur lors de l'enregistrement");
     }
   } catch (err) {
-    status.innerText = "❌ Erreur lors de l'envoi.";
+    status.innerText = "❌ Erreur d'enregistrement.";
   }
 });
