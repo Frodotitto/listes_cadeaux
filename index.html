@@ -140,6 +140,7 @@
       const addUrl = urlParams.get('add_url');
       const addPrice = urlParams.get('price');
       const addTitle = urlParams.get('title');
+      const jsDataParam = urlParams.get('js_data'); // Si envoyé en un seul bloc JSON
     
       if (addUrl) {
         if (!isAdmin) {
@@ -149,22 +150,31 @@
         const decodedUrl = decodeURIComponent(addUrl);
         document.getElementById('productUrl').value = decodedUrl;
     
-        // Remplissage des données directement transmises par iOS
-        if (addPrice && addPrice !== 'null') {
+        // Décodage si transmis sous forme de bloc JSON (iOS)
+        if (jsDataParam) {
+          try {
+            const parsed = JSON.parse(decodeURIComponent(jsDataParam));
+            if (parsed.price) document.getElementById('productPrice').value = parsed.price;
+            if (parsed.title) document.getElementById('productTitle').value = parsed.title;
+          } catch(e) {}
+        }
+    
+        // Décodage si transmis via des paramètres séparés (&price=...&title=...)
+        if (addPrice && addPrice !== 'null' && addPrice.trim() !== '') {
           document.getElementById('productPrice').value = decodeURIComponent(addPrice).trim();
         }
-        if (addTitle && addTitle !== 'null') {
+        if (addTitle && addTitle !== 'null' && addTitle.trim() !== '') {
           document.getElementById('productTitle').value = decodeURIComponent(addTitle).trim();
         }
     
-        // Nom du marchand extrait de l'URL
+        // Nom du marchand à partir de l'hôte
         try {
           document.getElementById('productStore').value = new URL(decodedUrl).hostname.replace('www.', '');
         } catch(e) {}
     
-        // Si on a déjà le titre ou le prix depuis iOS, ON NE LANCE PAS Microlink sur mobile
-        if (addTitle || addPrice) {
-          document.getElementById('fetchStatus').innerText = "✅ Infos récupérées depuis Safari !";
+        // Si on a déjà récupéré le titre ou le prix depuis Safari iOS, on valide directement
+        if (document.getElementById('productTitle').value || document.getElementById('productPrice').value) {
+          document.getElementById('fetchStatus').innerText = "✅ Infos extraites depuis Safari iOS !";
         } else {
           autoFillFromUrl();
         }
