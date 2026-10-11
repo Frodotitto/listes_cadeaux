@@ -78,14 +78,16 @@
     const SUPABASE_URL = 'https://glufuwoyxbyljnnthmbq.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdsdWZ1d295eGJ5bGpubnRobWJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3MTg4MjUsImV4cCI6MjEwNzI5NDgyNX0.Zi64NJ2qr07oZMCA8acwmD8f1fEP6NJN_DyO5IvrIUc';
     
-    const ACCESS_CODE = '1234';  // Mot de passe visiteurs
-    const ADMIN_CODE = '5678';   // Mot de passe Mode Créateur
+    // Configuration des mots de passe
+    const ACCESS_CODE = '1234';  // Code pour accéder au site
+    const ADMIN_CODE = '5678';   // Code pour activer le Mode Créateur
 
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     let isAdmin = false;
     let currentListId = null;
     let allLists = [];
 
+    // 1. GESTION DE L'AUTHENTIFICATION & SESSIONS
     window.addEventListener('DOMContentLoaded', () => {
       if (localStorage.getItem('site_access_granted') === 'true') {
         unlockSite();
@@ -129,40 +131,32 @@
       loadProducts();
     }
 
-    // Au chargement du site
-    window.addEventListener('DOMContentLoaded', () => {
-      if (localStorage.getItem('site_access_granted') === 'true') {
-        unlockSite();
-      }
-    });
-    
+    // 2. INITIALISATION & RECEPTION DES PARAMETRES (iOS / EXTENSION)
     async function initApp() {
       await loadLists();
       if (allLists.length > 0) selectList(allLists[0].id);
-    
-      // VÉRIFICATION DES PARAMÈTRES REÇUS
+
       const urlParams = new URLSearchParams(window.location.search);
       const addUrl = urlParams.get('add_url');
       const addPrice = urlParams.get('price');
-    
+
       if (addUrl) {
         if (!isAdmin) {
-          toggleAdmin(); // Active le mode créateur
+          document.getElementById('adminSection').classList.remove('hidden');
         }
-    
-        if (isAdmin) {
-          document.getElementById('productUrl').value = decodeURIComponent(addUrl);
-          
-          // Si le prix est fourni par le raccourci iOS, on l'utilise directement
-          if (addPrice) {
-            document.getElementById('productPrice').value = decodeURIComponent(addPrice) + ' €';
-          }
-    
-          autoFillFromUrl(); // Remplit l'image et le titre via Microlink
+
+        const decodedUrl = decodeURIComponent(addUrl);
+        document.getElementById('productUrl').value = decodedUrl;
+
+        if (addPrice && addPrice !== 'null' && addPrice.trim() !== '') {
+          document.getElementById('productPrice').value = decodeURIComponent(addPrice).trim();
         }
+
+        autoFillFromUrl();
       }
     }
 
+    // 3. CHARGEMENT & GESTION DES LISTES
     async function loadLists() {
       const { data: lists } = await supabaseClient.from('lists').select('*').order('id', { ascending: true });
       allLists = lists || [];
@@ -224,40 +218,59 @@
       });
     }
 
-    // EXTRACTION DU PRODUIT AVEC EXTRACTION AMÉLIORÉE DU PRIX
+    // 4. EXTRACTION AUTOMATIQUE (AVEC TIMEOUT DE SECURITE)
     async function autoFillFromUrl() {
       const url = document.getElementById('productUrl').value.trim();
       const status = document.getElementById('fetchStatus');
       if (!url) return;
-      status.innerText = "⏳ Récupération...";
-      try {
-        const res = await fetch(`https://api.microlink.io?url=${encodeURIComponent(url)}`);
-        const json = await res.json();
-        if (json.status === 'success') {
-          const d = json.data;
-          document.getElementById('productTitle').value = d.title || '';
-          document.getElementById('productImage').value = d.image ? d.image.url : '';
-          document.getElementById('productStore').value = d.publisher || new URL(url).hostname.replace('www.', '');
-          
-          let priceFound = '';
 
-          // Recherche multi-sources dans la réponse Microlink
-          if (d.price && typeof d.price === 'object') {
-            priceFound = `${d.price.amount} €`;
-          } else if (d.price) {
-            priceFound = `${d.price} €`;
-          } else if (d.description) {
-            const match = d.description.match(/(\d+[\.,]\d{2})\s?€/);
-            if (match) priceFound = match[0];
+      status.innerText = "⏳ Récupération des infos...";
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      try {
+        const res = await fetch(`https://api.microlink.io?url=${encodeURIComponent(url)}`, {
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        const json = await res.json();
+
+        if (json.status === 'success' && json.data) {
+          const d = json.data;
+
+          if (!document.getElementById('productTitle').value) {
+            document.getElementById('productTitle').value = d.title || '';
+          }
+          if (!document.getElementById('productImage').value) {
+            document.getElementById('productImage').value = d.image ? d.image.url : '';
+          }
+          if (!document.getElementById('productStore').value) {
+            document.getElementById('productStore').value = d.publisher || new URL(url).hostname.replace('www.', '');
           }
 
-          document.getElementById('productPrice').value = priceFound || 'Voir site';
-          status.innerText = "✅ Informations extraites !";
+          if (!document.getElementById('productPrice').value) {
+            let priceFound = '';
+            if (d.price && typeof d.price === 'object') {
+              priceFound = `${d.price.amount} €`;
+            } else if (d.description) {
+              const match = d.description.match(/(\d+[\.,]\d{2})\s?€/);
+              if (match) priceFound = match[0];
+            }
+            document.getElementById('productPrice').value = priceFound || 'Voir site';
+          }
+
+          status.innerText = "✅ Informations prêtes !";
+        } else {
+          throw new Error("Réponse incomplète");
         }
-      } catch (err) { status.innerText = "❌ Saisie manuelle requise."; }
+      } catch (err) {
+        status.innerText = "⚠️ Détection automatique partielle. Complétez si besoin.";
+      }
     }
 
-    // SAUVEGARDE AVEC VÉRIFICATION ANTI-DOUBLON
+    // 5. SAUVEGARDE AVEC VÉRIFICATION ANTI-DOUBLON
     async function saveProduct() {
       const title = document.getElementById('productTitle').value;
       const url = document.getElementById('productUrl').value;
@@ -268,8 +281,8 @@
         return;
       }
 
-      // 1. Vérification si l'URL existe déjà dans cette liste
-      const { data: existingProducts, error: checkError } = await supabaseClient
+      // Vérification anti-doublon
+      const { data: existingProducts } = await supabaseClient
         .from('products')
         .select('id')
         .eq('list_id', list_id)
@@ -280,7 +293,6 @@
         return;
       }
 
-      // 2. Insertion
       const { error } = await supabaseClient.from('products').insert([{
         title: title,
         url: url,
@@ -304,6 +316,7 @@
       }
     }
 
+    // 6. AFFICHAGE DES PRODUITS
     async function loadProducts() {
       const listContainer = document.getElementById('productList');
       listContainer.innerHTML = '';
