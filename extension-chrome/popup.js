@@ -1,4 +1,3 @@
-// ⚠️ Remplace avec tes identifiants Supabase
 const SUPABASE_URL = "https://glufuwoyxbyljnnthmbq.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdsdWZ1d295eGJ5bGpubnRobWJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3MTg4MjUsImV4cCI6MjEwNzI5NDgyNX0.Zi64NJ2qr07oZMCA8acwmD8f1fEP6NJN_DyO5IvrIUc";
 
@@ -39,20 +38,65 @@ async function loadLists() {
       select.appendChild(opt);
     });
   } catch (err) {
-    document.getElementById('status').innerText = "❌ Erreur de chargement.";
+    document.getElementById('status').innerText = "❌ Erreur de chargement des listes.";
   }
 }
 
+// Fonction exécutée directement sur la page du marchand
 function extractPageMeta() {
-  const getMeta = (prop) => document.querySelector(`meta[property="${prop}"]`)?.content || document.querySelector(`meta[name="${prop}"]`)?.content;
-  const title = getMeta('og:title') || document.title;
-  const image = getMeta('og:image');
-  const store = getMeta('og:site_name');
-  let price = getMeta('og:price:amount') || getMeta('product:price:amount');
+  const getMeta = (prop) => 
+    document.querySelector(`meta[property="${prop}"]`)?.content || 
+    document.querySelector(`meta[name="${prop}"]`)?.content;
+
+  const hostname = window.location.hostname;
+  let title = getMeta('og:title') || document.title;
+  let image = getMeta('og:image');
+  let price = '';
+  let store = getMeta('og:site_name') || hostname.replace('www.', '');
+
+  // 1. DÉTECTION SPÉCIFIQUE AMAZON
+  if (hostname.includes('amazon')) {
+    store = 'Amazon.fr';
+    
+    // Titre propre Amazon
+    const amazonTitle = document.getElementById('productTitle');
+    if (amazonTitle) title = amazonTitle.innerText.trim();
+
+    // Image principale du produit Amazon
+    const landingImage = document.getElementById('landingImage') || document.getElementById('imgBlkFront');
+    if (landingImage) {
+      image = landingImage.getAttribute('data-old-hires') || landingImage.src;
+    }
+
+    // Prix principal Amazon
+    const priceWhole = document.querySelector('.a-price-whole')?.innerText.replace(/\n|,/g, '').trim();
+    const priceFraction = document.querySelector('.a-price-fraction')?.innerText.trim();
+    if (priceWhole) {
+      price = `${priceWhole}${priceFraction ? ',' + priceFraction : ''} €`;
+    } else {
+      const apexPrice = document.querySelector('.apexPriceToPay .a-offscreen') || document.querySelector('#priceblock_ourprice');
+      if (apexPrice) price = apexPrice.innerText.trim();
+    }
+  }
+
+  // 2. DÉTECTION GÉNÉRIQUE SI PAS D'IMAGE OU DE PRIX TROUVÉ
+  if (!image) {
+    // Essaie de choper la première grande image de la page
+    const imgs = Array.from(document.querySelectorAll('img')).filter(img => img.width > 200 && img.height > 200);
+    if (imgs.length > 0) image = imgs[0].src;
+  }
+
   if (!price) {
-    const match = document.body.innerText.match(/(\d+[\.,]?\d*)\s?€/);
-    if (match) price = match[0];
-  } else { price += ' €'; }
+    // Repli sur métadonnées og:price ou recherche regex
+    const ogPrice = getMeta('og:price:amount') || getMeta('product:price:amount');
+    if (ogPrice) {
+      price = ogPrice + ' €';
+    } else {
+      const match = document.body.innerText.match(/(\d+[\.,]?\d*)\s?€/);
+      if (match) price = match[0];
+    }
+  }
+
   return { title, image, store, price };
 }
 
