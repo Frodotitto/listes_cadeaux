@@ -145,7 +145,6 @@
       document.getElementById('productUrl').value = addUrl;
     
       const jsData = params.get('js_data');
-      document.getElementById('fetchStatus').innerText = 'js_data = ' + jsData;
       if (jsData) {
         try {
           const parsed = JSON.parse(jsData);
@@ -154,6 +153,9 @@
           }
           if (parsed.title) {
             document.getElementById('productTitle').value = parsed.title;
+          }
+          if (parsed.image) {
+            document.getElementById('productImage').value = parsed.image;
           }
         } catch (e) {
           console.error('js_data invalide', e);
@@ -175,7 +177,16 @@
       } catch (e) {}
     
       // Complète ce qui manque (image, prix, titre) sans écraser ce qui est rempli
-      autoFillFromUrl();
+      const missing =
+        !document.getElementById('productTitle').value ||
+        !document.getElementById('productPrice').value ||
+        !document.getElementById('productImage').value;
+    
+      if (missing) {
+        autoFillFromUrl();
+      } else {
+        document.getElementById('fetchStatus').innerText = '✅ Infos extraites depuis Safari iOS !';
+      }
     }
 
     // 3. CHARGEMENT & GESTION DES LISTES
