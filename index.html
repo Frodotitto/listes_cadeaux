@@ -135,24 +135,39 @@
     async function initApp() {
       await loadLists();
       if (allLists.length > 0) selectList(allLists[0].id);
-
+    
       const urlParams = new URLSearchParams(window.location.search);
       const addUrl = urlParams.get('add_url');
       const addPrice = urlParams.get('price');
-
+      const addTitle = urlParams.get('title');
+    
       if (addUrl) {
         if (!isAdmin) {
           document.getElementById('adminSection').classList.remove('hidden');
         }
-
+    
         const decodedUrl = decodeURIComponent(addUrl);
         document.getElementById('productUrl').value = decodedUrl;
-
-        if (addPrice && addPrice !== 'null' && addPrice.trim() !== '') {
+    
+        // Remplissage des données directement transmises par iOS
+        if (addPrice && addPrice !== 'null') {
           document.getElementById('productPrice').value = decodeURIComponent(addPrice).trim();
         }
-
-        autoFillFromUrl();
+        if (addTitle && addTitle !== 'null') {
+          document.getElementById('productTitle').value = decodeURIComponent(addTitle).trim();
+        }
+    
+        // Nom du marchand extrait de l'URL
+        try {
+          document.getElementById('productStore').value = new URL(decodedUrl).hostname.replace('www.', '');
+        } catch(e) {}
+    
+        // Si on a déjà le titre ou le prix depuis iOS, ON NE LANCE PAS Microlink sur mobile
+        if (addTitle || addPrice) {
+          document.getElementById('fetchStatus').innerText = "✅ Infos récupérées depuis Safari !";
+        } else {
+          autoFillFromUrl();
+        }
       }
     }
 
