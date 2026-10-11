@@ -1,1 +1,10 @@
-
+{
+  "manifest_version": 3,
+  "name": "Ajouter à MesEnvies 🎁",
+  "version": "1.0",
+  "description": "Ajoute en un clic l'article en cours de visionnage à ta liste de cadeaux.",
+  "permissions": ["activeTab", "scripting"],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}
