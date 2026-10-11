@@ -145,6 +145,7 @@
       document.getElementById('productUrl').value = addUrl;
     
       const jsData = params.get('js_data');
+      document.getElementById('fetchStatus').innerText = 'js_data = ' + jsData;
       if (jsData) {
         try {
           const parsed = JSON.parse(jsData);
