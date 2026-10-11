@@ -140,19 +140,25 @@
       await loadLists();
       if (allLists.length > 0) selectList(allLists[0].id);
     
-      // VÉRIFICATION SI UNE URL A ÉTÉ TRANSMISE PAR LE BOOKMARKLET
+      // VÉRIFICATION DES PARAMÈTRES REÇUS
       const urlParams = new URLSearchParams(window.location.search);
       const addUrl = urlParams.get('add_url');
+      const addPrice = urlParams.get('price');
     
       if (addUrl) {
-        // Si l'utilisateur n'est pas en mode créateur, on lui propose d'activer le formulaire
         if (!isAdmin) {
-          toggleAdmin(); // Demande le mot de passe créateur (5678)
+          toggleAdmin(); // Active le mode créateur
         }
     
         if (isAdmin) {
           document.getElementById('productUrl').value = decodeURIComponent(addUrl);
-          autoFillFromUrl(); // Déclenche l'extraction automatique des infos
+          
+          // Si le prix est fourni par le raccourci iOS, on l'utilise directement
+          if (addPrice) {
+            document.getElementById('productPrice').value = decodeURIComponent(addPrice) + ' €';
+          }
+    
+          autoFillFromUrl(); // Remplit l'image et le titre via Microlink
         }
       }
     }
