@@ -4,24 +4,33 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 document.addEventListener('DOMContentLoaded', async () => {
   await loadLists();
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const status = document.getElementById('status');
 
-  chrome.scripting.executeScript({
-    target: { tabId: tab.id },
-    func: extractUniversalMeta,
-  }, (results) => {
-    if (!results || !results[0]?.result) {
-      document.getElementById('status').innerText = "❌ Échec de la lecture de la page.";
-      return;
-    }
+  let data = null;
+  try {
+    const [res] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ['extract.js']
+    });
+    data = res && res.result;
+  } catch (e) {
+    console.error('Extraction impossible', e);
+  }
 
-    const data = results[0].result;
-    document.getElementById('title').value = data.title || tab.title;
-    document.getElementById('price').value = data.price || "Voir site";
-    document.getElementById('store').value = data.store || new URL(tab.url).hostname.replace('www.', '');
-    document.getElementById('image').value = data.image || '';
+  if (!data) {
+    status.innerText = "❌ Échec de la lecture de la page.";
+    document.getElementById('title').value = tab.title || '';
     document.getElementById('url').value = tab.url;
-    document.getElementById('status').innerText = "✅ Infos extraites. Prêt !";
-  });
+    return;
+  }
+
+  const hasPrice = data.price && data.price !== 'Non renseigné';
+  document.getElementById('title').value = data.title || tab.title;
+  document.getElementById('price').value = hasPrice ? data.price : 'Voir site';
+  document.getElementById('store').value = data.store || new URL(tab.url).hostname.replace('www.', '');
+  document.getElementById('image').value = data.image || '';
+  document.getElementById('url').value = tab.url;
+  status.innerText = "✅ Infos extraites. Prêt ! " + JSON.stringify(data.src || {});
 });
 
 async function loadLists() {
@@ -40,84 +49,6 @@ async function loadLists() {
   } catch (err) {
     document.getElementById('status').innerText = "❌ Erreur de chargement des listes.";
   }
-}
-
-// STRATÉGIE UNIVERSELLE D'EXTRACTION DE PRIX & INFOS
-function extractUniversalMeta() {
-  let title = '', image = '', price = '', store = '';
-  const hostname = window.location.hostname;
-
-  const getMeta = (prop) => 
-    document.querySelector(`meta[property="${prop}"]`)?.content || 
-    document.querySelector(`meta[name="${prop}"]`)?.content;
-
-  // -------------------------------------------------------------
-  // STRATÉGIE 1 : DONNÉES STRUCTURÉES JSON-LD (Ultra fiable)
-  // -------------------------------------------------------------
-  const jsonLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
-  for (const script of jsonLdScripts) {
-    try {
-      const data = JSON.parse(script.innerText);
-      const items = Array.isArray(data) ? data : [data];
-
-      for (const item of items) {
-        // Recherche du schéma Product
-        if (item['@type'] === 'Product' || item['@type']?.includes('Product')) {
-          if (!title && item.name) title = item.name;
-          if (!image && item.image) {
-            image = Array.isArray(item.image) ? item.image[0] : item.image;
-            if (typeof image === 'object') image = image.url;
-          }
-
-          if (item.offers) {
-            const offer = Array.isArray(item.offers) ? item.offers[0] : item.offers;
-            const p = offer.price || offer.lowPrice;
-            if (p) {
-              price = `${parseFloat(p).toFixed(2).replace('.', ',')} €`;
-            }
-          }
-        }
-      }
-    } catch (e) {}
-  }
-
-  // -------------------------------------------------------------
-  // STRATÉGIE 2 : SÉLECTEURS DE SECOURS PAR ENSEIGNE
-  // -------------------------------------------------------------
-  if (hostname.includes('fnac')) {
-    store = 'Fnac';
-    // Prix principal Fnac (évite les mensualités / occasion)
-    const fnacPrice = document.querySelector('.f-priceBox__price') || 
-                      document.querySelector('.f-buyBox-availabilityOffer .price') ||
-                      document.querySelector('.priceText');
-    if (fnacPrice && !price) {
-      price = fnacPrice.innerText.replace(/[^\d,\.]/g, '').trim() + ' €';
-    }
-  } else if (hostname.includes('amazon')) {
-    store = 'Amazon.fr';
-    const amazonPrice = document.querySelector('.apexPriceToPay .a-offscreen') || 
-                        document.querySelector('#corePrice_feature_div .a-offscreen');
-    if (amazonPrice) price = amazonPrice.innerText.trim();
-
-    const amazonImg = document.getElementById('landingImage') || document.getElementById('imgBlkFront');
-    if (amazonImg && !image) image = amazonImg.getAttribute('data-old-hires') || amazonImg.src;
-  }
-
-  // -------------------------------------------------------------
-  // STRATÉGIE 3 : MÉTA-DONNÉES GLOBALES (OpenGraph)
-  // -------------------------------------------------------------
-  if (!title) title = getMeta('og:title') || document.title;
-  if (!image) image = getMeta('og:image') || getMeta('twitter:image') || '';
-  if (!store) store = getMeta('og:site_name') || hostname.replace('www.', '');
-
-  if (!price) {
-    const metaPrice = getMeta('product:price:amount') || getMeta('og:price:amount');
-    if (metaPrice) {
-      price = `${parseFloat(metaPrice).toFixed(2).replace('.', ',')} €`;
-    }
-  }
-
-  return { title, image, store, price };
 }
 
 document.getElementById('saveBtn').addEventListener('click', async () => {
