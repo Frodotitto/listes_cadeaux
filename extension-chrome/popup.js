@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     func: extractPageMeta,
   }, (results) => {
     if (!results || !results[0]?.result) {
-      document.getElementById('status').innerText = "❌ Échec de la lecture.";
+      document.getElementById('status').innerText = "❌ Échec de la lecture de la page.";
       return;
     }
 
@@ -42,7 +42,7 @@ async function loadLists() {
   }
 }
 
-// Fonction d'extraction avancée sur la page
+// Fonction d'extraction exécutée dans l'onglet actif
 function extractPageMeta() {
   const getMeta = (prop) => 
     document.querySelector(`meta[property="${prop}"]`)?.content || 
@@ -50,31 +50,52 @@ function extractPageMeta() {
 
   const hostname = window.location.hostname;
   let title = getMeta('og:title') || document.title;
-  let image = getMeta('og:image') || '';
+  let image = '';
   let price = '';
   let store = getMeta('og:site_name') || hostname.replace('www.', '');
 
-  // SPÉCIFIQUE AMAZON
+  // 1. EXTRACTION SPÉCIFIQUE AMAZON
   if (hostname.includes('amazon')) {
     store = 'Amazon.fr';
-    
-    // 1. Extraction du Titre Amazon
+
+    // Titre
     const amazonTitle = document.getElementById('productTitle');
     if (amazonTitle) title = amazonTitle.innerText.trim();
 
-    // 2. Extraction de l'Image HD Amazon
-    const imgEl = document.getElementById('landingImage') || 
-                  document.getElementById('imgBlkFront') || 
-                  document.querySelector('#main-image-container img') ||
-                  document.querySelector('#imgTagWrapperId img');
-    if (imgEl) {
-      // Priorité aux attributs HD d'Amazon
-      image = imgEl.getAttribute('data-old-hires') || 
-              imgEl.getAttribute('data-dynamic-image') ? Object.keys(JSON.parse(imgEl.getAttribute('data-dynamic-image') || '{}'))[0] : null ||
-              imgEl.src;
+    // Image (Recherche avancée dans le DOM Amazon)
+    const imgCandidates = [
+      document.getElementById('landingImage'),
+      document.getElementById('imgBlkFront'),
+      document.querySelector('#main-image-container img'),
+      document.querySelector('#imgTagWrapperId img'),
+      document.querySelector('.a-dynamic-image')
+    ];
+
+    for (const img of imgCandidates) {
+      if (img) {
+        const hires = img.getAttribute('data-old-hires');
+        const dynamic = img.getAttribute('data-dynamic-image');
+        
+        if (hires && hires.startsWith('http')) {
+          image = hires;
+          break;
+        } else if (dynamic) {
+          try {
+            const parsed = JSON.parse(dynamic);
+            const keys = Object.keys(parsed);
+            if (keys.length > 0) {
+              image = keys[keys.length - 1]; // Prend la résolution la plus élevée
+              break;
+            }
+          } catch (e) {}
+        } else if (img.src && img.src.startsWith('http') && !img.src.includes('sprite') && !img.src.includes('transparent-pixel')) {
+          image = img.src;
+          break;
+        }
+      }
     }
 
-    // 3. Extraction du Prix Amazon principal
+    // Prix
     const offscreenPrice = document.querySelector('.apexPriceToPay .a-offscreen') || 
                            document.querySelector('#corePrice_feature_div .a-offscreen') ||
                            document.querySelector('.a-price .a-offscreen');
@@ -87,10 +108,14 @@ function extractPageMeta() {
     }
   }
 
-  // REPLI GÉNÉRIQUE (pour les autres sites e-commerce)
+  // 2. REPLI GÉNÉRIQUE POUR LES AUTRES SITES
+  if (!image) {
+    image = getMeta('og:image') || getMeta('twitter:image') || '';
+  }
+
   if (!image) {
     const mainImg = document.querySelector('article img, .product img, main img');
-    if (mainImg) image = mainImg.src;
+    if (mainImg && mainImg.src.startsWith('http')) image = mainImg.src;
   }
 
   if (!price) {
@@ -106,34 +131,62 @@ function extractPageMeta() {
   return { title, image, store, price };
 }
 
+// Enregistrement avec vérification préalable des doublons
 document.getElementById('saveBtn').addEventListener('click', async () => {
   const status = document.getElementById('status');
   const listId = document.getElementById('listSelect').value;
+  const url = document.getElementById('url').value;
+
   if (!listId) return status.innerText = "⚠️ Choisis une liste.";
 
-  status.innerText = "⏳ Enregistrement...";
-  const payload = {
-    title: document.getElementById('title').value,
-    url: document.getElementById('url').value,
-    image_url: document.getElementById('image').value || 'https://via.placeholder.com/300',
-    store_name: document.getElementById('store').value || 'Boutique',
-    price: document.getElementById('price').value || 'Non renseigné',
-    list_id: parseInt(listId),
-    is_bought: false
-  };
+  status.innerText = "⏳ Vérification du doublon...";
 
   try {
+    // 1. Vérification si l'URL existe déjà dans cette liste
+    const checkRes = await fetch(`${SUPABASE_URL}/rest/v1/products?list_id=eq.${listId}&url=eq.${encodeURIComponent(url)}&select=id`, {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`
+      }
+    });
+
+    const existingProducts = await checkRes.json();
+
+    if (existingProducts && existingProducts.length > 0) {
+      status.innerText = "⚠️ Cet article est déjà présent dans cette liste !";
+      return;
+    }
+
+    // 2. Insertion si pas de doublon
+    status.innerText = "⏳ Enregistrement...";
+    const payload = {
+      title: document.getElementById('title').value,
+      url: url,
+      image_url: document.getElementById('image').value || 'https://via.placeholder.com/300',
+      store_name: document.getElementById('store').value || 'Boutique',
+      price: document.getElementById('price').value || 'Non renseigné',
+      list_id: parseInt(listId),
+      is_bought: false
+    };
+
     const res = await fetch(`${SUPABASE_URL}/rest/v1/products`, {
       method: 'POST',
       headers: {
-        'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json', 'Prefer': 'return=minimal'
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
       },
       body: JSON.stringify(payload)
     });
+
     if (res.ok) {
       status.innerText = "🎉 Ajouté à la liste !";
       setTimeout(() => window.close(), 1200);
+    } else {
+      throw new Error("Erreur lors de l'enregistrement");
     }
-  } catch (err) { status.innerText = "❌ Erreur lors de l'envoi."; }
+  } catch (err) {
+    status.innerText = "❌ Erreur lors de l'envoi.";
+  }
 });
