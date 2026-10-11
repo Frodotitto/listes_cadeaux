@@ -129,9 +129,32 @@
       loadProducts();
     }
 
+    // Au chargement du site
+    window.addEventListener('DOMContentLoaded', () => {
+      if (localStorage.getItem('site_access_granted') === 'true') {
+        unlockSite();
+      }
+    });
+    
     async function initApp() {
       await loadLists();
       if (allLists.length > 0) selectList(allLists[0].id);
+    
+      // VÉRIFICATION SI UNE URL A ÉTÉ TRANSMISE PAR LE BOOKMARKLET
+      const urlParams = new URLSearchParams(window.location.search);
+      const addUrl = urlParams.get('add_url');
+    
+      if (addUrl) {
+        // Si l'utilisateur n'est pas en mode créateur, on lui propose d'activer le formulaire
+        if (!isAdmin) {
+          toggleAdmin(); // Demande le mot de passe créateur (5678)
+        }
+    
+        if (isAdmin) {
+          document.getElementById('productUrl').value = decodeURIComponent(addUrl);
+          autoFillFromUrl(); // Déclenche l'extraction automatique des infos
+        }
+      }
     }
 
     async function loadLists() {
