@@ -18,7 +18,6 @@
     var isFnac = /(^|\.)fnac\./i.test(hostname);
     var junk = /(sprite|logo|icon|loader|spinner|placeholder|blank|pixel|spacer|avatar|badge|flag|\.svg(\?|$))/i;
 
-    // ---------- Utilitaires ----------
     function clean(s) { return String(s || '').trim().replace(/\s+/g, ' '); }
     function meta(sel) {
       var e = document.querySelector(sel);
@@ -67,7 +66,6 @@
       return '';
     }
 
-    // Élément barré (ancien prix) ou marqué comme tel
     function struck(e) {
       for (var n = e, d = 0; n && d < 6; n = n.parentElement, d++) {
         if (/^(DEL|S|STRIKE)$/.test(n.tagName)) return true;
@@ -76,7 +74,6 @@
       return false;
     }
 
-    // Premier élément non barré dont le texte contient un chiffre
     function firstPrice(sels) {
       for (var i = 0; i < sels.length; i++) {
         var list = document.querySelectorAll(sels[i]);
@@ -89,7 +86,6 @@
       return '';
     }
 
-    // ---------- JSON-LD : on aplatit tout et on indexe par @id ----------
     var ldNodes = [];
     var ldRaw = [];
     var byId = {};
@@ -156,7 +152,6 @@
       return '';
     }
 
-    // ---------- Images : meilleure source d'une balise <img> ----------
     function bestFromSrcset(ss) {
       if (!ss) return '';
       var best = '', bw = -1;
@@ -183,9 +178,7 @@
              abs(img.getAttribute('src'));
     }
 
-    // ---------- PRIX ----------
     var price = run([
-      // 1. Sélecteurs très précis des grandes enseignes (Fnac, Amazon, etc.)
       ['known', function () {
         if (isFnac) {
           var fnacEl = document.querySelector('.f-priceBox__price') ||
@@ -209,7 +202,6 @@
           '[data-automation-id="product-price"]'
         ]);
       }],
-      // 2. Données structurées JSON-LD
       ['ld', function () {
         for (var i = 0; i < ldNodes.length; i++) {
           if (ldNodes[i].offers) {
@@ -219,7 +211,6 @@
         }
         return '';
       }],
-      // 3. JSON-LD brut via regex
       ['ld-regex', function () {
         for (var i = 0; i < ldRaw.length; i++) {
           var m = ldRaw[i].match(/"(?:price|lowPrice)"\s*:\s*"?(\d[\d.,]*)"?/);
@@ -230,7 +221,6 @@
         }
         return '';
       }],
-      // 4. Balises Meta (OpenGraph & Schema)
       ['meta', function () {
         var v = meta('meta[property="product:price:amount"]') ||
                 meta('meta[property="og:price:amount"]') ||
@@ -241,7 +231,6 @@
                 meta('meta[itemprop="priceCurrency"]');
         return fmtRaw(v, c);
       }],
-      // 5. Microdonnées HTML
       ['microdata', function () {
         var e = document.querySelector('[itemprop="price"]');
         if (!e) return '';
@@ -251,7 +240,6 @@
         var c = ce ? clean(ce.getAttribute('content') || ce.textContent) : '';
         return fmtRaw(v, c);
       }],
-      // 6. Sélecteurs CMS (WooCommerce, Shopify, PrestaShop, Magento)
       ['cms', function () {
         return firstPrice([
           '.summary .woocommerce-Price-amount',
@@ -270,7 +258,6 @@
           '.special-price .price'
         ]);
       }],
-      // 7. Heuristique visuelle de secours
       ['heuristic', function () {
         var re = /^\s*(?:(?:dès|à partir de|from)\s*)?(?:[€$£]\s?\d[\d\s\u00a0.,]*|\d[\d\s\u00a0.,]*\s?(?:€|EUR|\$|£))\s*(?:TTC|HT)?\s*$/i;
         var all = document.body.getElementsByTagName('*');
@@ -291,7 +278,6 @@
       }]
     ], 'price');
 
-    // ---------- IMAGE ----------
     var image = run([
       ['amazon', function () {
         if (!isAmazon) return '';
@@ -381,7 +367,6 @@
       }]
     ], 'image');
 
-    // ---------- TITRE ----------
     var rawTitle = run([
       ['amazon', function () {
         return isAmazon ? (txt('#productTitle') || txt('#title')) : '';
@@ -409,10 +394,8 @@
       }]
     ], 'title') || clean(document.title);
 
-    // Nettoyage des suffixes de titres
     var title = rawTitle.replace(/\s*[\-\|]\s*(Amazon|Fnac|Darty|Cdiscount|Boulanger|Vinted).*$/i, '').trim();
 
-    // ---------- MARCHAND ----------
     var store = clean(meta('meta[property="og:site_name"]')) || hostname.replace(/^www\./, '');
     if (isAmazon) {
       store = hostname.replace(/^www\./, '');
@@ -430,18 +413,16 @@
     };
   }
 
-  // ---------- Sortie selon l'environnement ----------
   var data = extractProduct();
 
   if (typeof completion === 'function') {
-    // iPhone / Raccourcis : on renvoie l'URL complète à ouvrir sous forme d'objet JSON
+    // Mode iOS Raccourci : Redirection vers le mode Quick Add sans passer par la partie visiteur
     completion(JSON.stringify({
-      url: BASE + '?add_url=' + encodeURIComponent(location.href) +
+      url: BASE + '?quick_add=true&add_url=' + encodeURIComponent(location.href) +
            '&js_data=' + encodeURIComponent(JSON.stringify(data))
     }));
     return;
   }
 
-  // Extension PC : la valeur de retour est récupérée par executeScript
   return data;
 })();
