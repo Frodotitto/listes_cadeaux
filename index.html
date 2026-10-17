@@ -79,14 +79,20 @@
       </div>
       <p id="fetchStatus" class="text-xs text-indigo-600 mb-3 h-4"></p>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <input type="text" id="productTitle" placeholder="Titre du produit" class="p-2 border rounded-lg text-sm">
         <input type="text" id="productPrice" placeholder="Prix (ex: 49.99 €)" class="p-2 border rounded-lg text-sm">
         <input type="text" id="productStore" placeholder="Marchand (ex: Fnac)" class="p-2 border rounded-lg text-sm">
         <input type="url" id="productImage" placeholder="URL de l'image" class="p-2 border rounded-lg text-sm">
       </div>
 
-      <button type="button" onclick="saveProduct()" class="w-full mt-4 bg-emerald-600 text-white py-2.5 rounded-lg font-bold hover:bg-emerald-700 text-sm">
+      <!-- Champ Commentaire libre -->
+      <div class="mb-4">
+        <label class="block text-xs font-semibold text-slate-500 mb-1">Commentaire / Remarques (taille, couleur, détails...) :</label>
+        <textarea id="productComment" rows="2" placeholder="Ex: Prendre la couleur bleue en taille L" class="w-full p-2 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
+      </div>
+
+      <button type="button" onclick="saveProduct()" class="w-full mt-2 bg-emerald-600 text-white py-2.5 rounded-lg font-bold hover:bg-emerald-700 text-sm">
         💾 Enregistrer dans la liste
       </button>
     </section>
@@ -99,14 +105,13 @@
   </main>
 
   <script>
-    // Variables injectées par GitHub Actions (forcées en String avec des guillemets)
+    // Variables injectées par GitHub Actions au déploiement
     const SUPABASE_URL = "__SUPABASE_URL__";
     const SUPABASE_KEY = "__SUPABASE_KEY__";
     const ACCESS_CODE_GUEST = "__GUEST_PASSWORD__";
     const ACCESS_CODE_ADMIN = "__ADMIN_PASSWORD__";
     const QUICK_ADD_TOKEN = "__QUICK_ADD_TOKEN__";
 
-    // Nettoyage sécurisé
     function getSecret(val) {
       if (!val) return "";
       const str = String(val).trim();
@@ -126,7 +131,6 @@
     let allLists = [];
     let isQuickAdd = false;
 
-    // Fonctions globales pour la modale
     function selectRole(role) {
       selectedRole = role;
       
@@ -269,7 +273,7 @@
       if (addUrl) {
         let decodedUrl = decodeURIComponent(addUrl);
         if (!decodedUrl.startsWith('http://') && !decodedUrl.startsWith('https://')) {
-          decodedUrl = 'https://' + decodedUrl.replace(/^%2f|\/+/i, '');
+          decodedUrl = 'https://' + decodedUrl.replace(/^(2f|%2f|\/)+/i, '');
         }
 
         document.getElementById('productUrl').value = decodedUrl;
@@ -282,6 +286,7 @@
             if (parsed.title) document.getElementById('productTitle').value = parsed.title;
             if (parsed.image) document.getElementById('productImage').value = parsed.image;
             if (parsed.store) document.getElementById('productStore').value = parsed.store;
+            if (parsed.comment) document.getElementById('productComment').value = parsed.comment;
           } catch(e) {}
         }
 
@@ -448,6 +453,7 @@
         image_url: document.getElementById('productImage').value || 'https://via.placeholder.com/300',
         store_name: document.getElementById('productStore').value || 'Boutique',
         price: document.getElementById('productPrice').value || 'Non renseigné',
+        comment: document.getElementById('productComment').value || '',
         list_id: parseInt(list_id),
         is_bought: false
       }]);
@@ -459,7 +465,7 @@
           alert("🎉 Article ajouté avec succès à la liste !");
           window.location.href = window.location.pathname;
         } else {
-          const fields = ['productUrl', 'productTitle', 'productPrice', 'productStore', 'productImage'];
+          const fields = ['productUrl', 'productTitle', 'productPrice', 'productStore', 'productImage', 'productComment'];
           fields.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
           document.getElementById('fetchStatus').innerText = '';
           window.history.replaceState({}, document.title, window.location.pathname);
@@ -499,7 +505,10 @@
         card.innerHTML = `
           <div>
             <div class="h-48 overflow-hidden bg-slate-100 relative">
-              <img src="${product.image_url}" alt="${product.title}" referrerpolicy="no-referrer" class="w-full h-full object-contain p-2">
+              <img src="${product.image_url}" alt="${product.title}" 
+                   referrerpolicy="no-referrer"
+                   onerror="this.onerror=null; this.src='https://images.weserv.nl/?url=' + encodeURIComponent('${product.image_url}');"
+                   class="w-full h-full object-contain p-2">
               ${showBoughtStatus ? '<span class="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded font-bold">🎁 Déjà offert</span>' : ''}
               ${currentRole === 'admin' ? `<button type="button" onclick="deleteProduct(${product.id})" class="absolute top-2 right-2 bg-slate-800 bg-opacity-70 text-white p-1.5 rounded-full hover:bg-red-600 transition text-xs cursor-pointer">🗑️</button>` : ''}
             </div>
@@ -507,6 +516,7 @@
               <span class="text-xs font-semibold text-indigo-500 uppercase tracking-wider">${product.store_name}</span>
               <h3 class="font-bold text-slate-800 text-base line-clamp-2 mt-1">${product.title}</h3>
               <p class="text-lg font-extrabold text-slate-900 mt-2">${product.price}</p>
+              ${product.comment ? `<p class="mt-2 text-xs text-slate-600 bg-amber-50 border border-amber-200 p-2 rounded-lg italic">💬 ${product.comment}</p>` : ''}
             </div>
           </div>
           <div class="p-4 border-t bg-slate-50 flex flex-col gap-2">
