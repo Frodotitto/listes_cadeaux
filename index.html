@@ -10,8 +10,8 @@
 <body class="bg-slate-50 text-slate-800 font-sans min-h-screen p-4 md:p-8">
 
   <!-- Modal de connexion (Choix du rôle & Mot de passe) -->
-  <div id="authModal" class="fixed inset-0 bg-slate-900 bg-opacity-80 flex items-center justify-center z-50">
-    <div class="bg-white p-6 rounded-2xl shadow-2xl max-w-sm w-full text-center">
+  <div id="authModal" class="fixed inset-0 bg-slate-900 bg-opacity-80 flex items-center justify-center z-50 p-4">
+    <div class="bg-white p-6 rounded-2xl shadow-2xl max-w-sm w-full text-center relative z-10">
       
       <!-- Étape 1 : Choix du Mode -->
       <div id="roleSelectionStep">
@@ -19,10 +19,10 @@
         <p class="text-xs text-slate-500 mb-6">Comment souhaitez-vous vous connecter ?</p>
         
         <div class="flex flex-col gap-3">
-          <button type="button" onclick="selectRole('guest')" class="w-full bg-indigo-50 border-2 border-indigo-200 hover:bg-indigo-100 text-indigo-700 py-3 rounded-xl font-bold transition flex items-center justify-center gap-2">
+          <button type="button" onclick="selectRole('guest')" class="w-full bg-indigo-50 border-2 border-indigo-200 hover:bg-indigo-100 text-indigo-700 py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 cursor-pointer">
             <span>👥 Visiteur / Proche</span>
           </button>
-          <button type="button" onclick="selectRole('admin')" class="w-full bg-slate-100 border-2 border-slate-200 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-bold transition flex items-center justify-center gap-2">
+          <button type="button" onclick="selectRole('admin')" class="w-full bg-slate-100 border-2 border-slate-200 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 cursor-pointer">
             <span>✏️ Créateur de la liste</span>
           </button>
         </div>
@@ -30,8 +30,8 @@
 
       <!-- Étape 2 : Saisie du Mot de Passe -->
       <div id="passwordStep" class="hidden">
-        <button type="button" onclick="resetRoleSelection()" class="text-xs text-slate-400 hover:text-slate-600 mb-3 block">← Changer de mode</button>
-        <h3 id="passwordTitle" class="text-lg font-bold mb-2">Accès Restreint</h3>
+        <button type="button" onclick="resetRoleSelection()" class="text-xs text-slate-400 hover:text-slate-600 mb-3 block mx-auto cursor-pointer">← Changer de mode</button>
+        <h3 id="passwordTitle" class="text-lg font-bold mb-2 text-slate-800">Accès Restreint</h3>
         <p id="passwordSubtitle" class="text-xs text-slate-500 mb-4"></p>
 
         <input 
@@ -39,9 +39,9 @@
           id="passInput" 
           class="w-full p-2.5 border rounded-xl mb-4 text-center text-lg font-bold tracking-widest focus:ring-2 focus:ring-indigo-500 outline-none" 
           placeholder="••••"
-          onkeyup="if(event.key === 'Enter') validatePassword()"
+          onkeydown="if(event.key === 'Enter') validatePassword()"
         >
-        <button type="button" onclick="validatePassword()" class="w-full bg-indigo-600 text-white py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition">
+        <button type="button" onclick="validatePassword()" class="w-full bg-indigo-600 text-white py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition cursor-pointer">
           Valider
         </button>
         <p id="authError" class="text-red-500 text-xs mt-3 hidden">Code incorrect. Réessayez.</p>
@@ -99,14 +99,14 @@
   </main>
 
   <script>
-    // Variables injectées exclusivement par GitHub Actions au moment du déploiement
+    // Variables injectées par GitHub Actions au déploiement
     const SUPABASE_URL = '__SUPABASE_URL__';
     const SUPABASE_KEY = '__SUPABASE_KEY__';
     const ACCESS_CODE_GUEST = '__GUEST_PASSWORD__';
     const ACCESS_CODE_ADMIN = '__ADMIN_PASSWORD__';
     const QUICK_ADD_TOKEN = '__QUICK_ADD_TOKEN__';
 
-    // Fonction de nettoyage des balises
+    // Fonction de vérification des secrets injectés
     const getSecret = (val) => (val && typeof val === 'string' && !val.startsWith('__')) ? val.trim() : '';
 
     const ACTUAL_URL = getSecret(SUPABASE_URL);
@@ -127,7 +127,7 @@
         if (typeof window.supabase !== 'undefined' && ACTUAL_URL && ACTUAL_KEY) {
           supabaseClient = window.supabase.createClient(ACTUAL_URL, ACTUAL_KEY);
         } else {
-          console.warn("Clés Supabase manquantes ou invalides.");
+          console.warn("Clés Supabase manquantes ou non injectées.");
         }
       } catch(e) {
         console.error("Erreur d'initialisation Supabase :", e);
@@ -137,7 +137,7 @@
       isQuickAdd = urlParams.get('quick_add') === 'true';
       const tokenParam = urlParams.get('token');
 
-      // Déverrouillage automatique si token iOS valide fourni
+      // Déverrouillage automatique si token iOS valide
       if (isQuickAdd && tokenParam && ACTUAL_QUICK_TOKEN && tokenParam === ACTUAL_QUICK_TOKEN) {
         currentRole = 'admin';
         localStorage.setItem('user_role', 'admin');
@@ -152,7 +152,7 @@
           currentRole = 'admin';
           unlockQuickAddMode();
         } else {
-          selectRole('admin');
+          window.selectRole('admin');
         }
         return;
       }
@@ -163,7 +163,7 @@
       }
     });
 
-    function selectRole(role) {
+    window.selectRole = function(role) {
       selectedRole = role;
       
       const roleStep = document.getElementById('roleSelectionStep');
@@ -185,20 +185,21 @@
       }
 
       if (passInput) {
-        setTimeout(() => passInput.focus(), 50);
+        setTimeout(() => passInput.focus(), 100);
       }
-    }
+    };
 
-    function resetRoleSelection() {
-      document.getElementById('roleSelectionStep')?.classList.remove('hidden');
-      document.getElementById('passwordStep')?.classList.add('hidden');
-    }
+    window.resetRoleSelection = function() {
+      const roleStep = document.getElementById('roleSelectionStep');
+      const passStep = document.getElementById('passwordStep');
+      if (roleStep) roleStep.classList.remove('hidden');
+      if (passStep) passStep.classList.add('hidden');
+    };
 
-    function validatePassword() {
+    window.validatePassword = function() {
       const input = document.getElementById('passInput').value.trim();
       const expectedCode = selectedRole === 'guest' ? ACTUAL_GUEST_PASS : ACTUAL_ADMIN_PASS;
 
-      // Un mot de passe valide et non vide doit impérativement correspondre à la valeur injectée
       if (expectedCode !== '' && input === expectedCode) {
         currentRole = selectedRole;
         localStorage.setItem('user_role', currentRole);
@@ -208,15 +209,19 @@
         const errorEl = document.getElementById('authError');
         if (errorEl) errorEl.classList.remove('hidden');
       }
-    }
+    };
 
     function unlockQuickAddMode() {
-      document.getElementById('authModal')?.classList.add('hidden');
+      const modal = document.getElementById('authModal');
+      const appContent = document.getElementById('appContent');
+
+      if (modal) modal.classList.add('hidden');
+      if (appContent) appContent.classList.remove('opacity-10', 'pointer-events-none');
+
       document.getElementById('mainHeader')?.classList.add('hidden');
       document.getElementById('tabsContainer')?.classList.add('hidden');
       document.getElementById('productList')?.classList.add('hidden');
 
-      document.getElementById('appContent')?.classList.remove('opacity-10', 'pointer-events-none');
       document.getElementById('adminSection')?.classList.remove('hidden');
       document.getElementById('formHeaderTitle').innerText = "⚡ Ajout rapide iOS";
 
@@ -224,27 +229,34 @@
     }
 
     function unlockSite() {
-      document.getElementById('authModal')?.classList.add('hidden');
-      document.getElementById('appContent')?.classList.remove('opacity-10', 'pointer-events-none');
+      const modal = document.getElementById('authModal');
+      const appContent = document.getElementById('appContent');
+
+      if (modal) modal.classList.add('hidden');
+      if (appContent) appContent.classList.remove('opacity-10', 'pointer-events-none');
       
       const roleBadge = document.getElementById('roleBadge');
       if (currentRole === 'admin') {
-        roleBadge.innerText = "Mode Créateur (Surprise préservée)";
-        roleBadge.className = "text-indigo-600 text-sm font-bold";
+        if (roleBadge) {
+          roleBadge.innerText = "Mode Créateur (Surprise préservée)";
+          roleBadge.className = "text-indigo-600 text-sm font-bold";
+        }
         document.getElementById('adminSection')?.classList.remove('hidden');
       } else {
-        roleBadge.innerText = "Espace Visiteur / Proches";
-        roleBadge.className = "text-slate-500 text-sm";
+        if (roleBadge) {
+          roleBadge.innerText = "Espace Visiteur / Proches";
+          roleBadge.className = "text-slate-500 text-sm";
+        }
         document.getElementById('adminSection')?.classList.add('hidden');
       }
 
       initApp();
     }
 
-    function logout() {
+    window.logout = function() {
       localStorage.removeItem('user_role');
       window.location.href = window.location.pathname;
-    }
+    };
 
     async function initApp() {
       await loadLists();
@@ -318,7 +330,7 @@
       if (currentRole === 'admin') {
         const addBtn = document.createElement('button');
         addBtn.type = 'button';
-        addBtn.className = 'px-3 py-2 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-300 hover:bg-emerald-200';
+        addBtn.className = 'px-3 py-2 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-300 hover:bg-emerald-200 cursor-pointer';
         addBtn.innerText = '➕ Nouvelle Liste';
         addBtn.onclick = createNewList;
         container.appendChild(addBtn);
@@ -341,14 +353,14 @@
       if (data && data[0]) selectList(data[0].id);
     }
 
-    async function deleteList(e, id) {
+    window.deleteList = async function(e, id) {
       if (!supabaseClient) return;
       e.stopPropagation();
       if (!confirm("Supprimer cette liste et ses articles ?")) return;
       await supabaseClient.from('lists').delete().eq('id', id);
       currentListId = null;
       await loadLists();
-    }
+    };
 
     function updateListDropdown() {
       const select = document.getElementById('formListSelect');
@@ -372,7 +384,7 @@
       });
     }
 
-    async function autoFillFromUrl() {
+    window.autoFillFromUrl = async function() {
       const url = document.getElementById('productUrl').value.trim();
       const status = document.getElementById('fetchStatus');
       if (!url) return;
@@ -406,9 +418,9 @@
       } catch (err) {
         status.innerText = "⚠️ Détection automatique partielle. Complétez si besoin.";
       }
-    }
+    };
 
-    async function saveProduct() {
+    window.saveProduct = async function() {
       if (currentRole !== 'admin') return alert("Action réservée au créateur.");
       if (!supabaseClient) return alert("Base de données non connectée.");
 
@@ -452,7 +464,7 @@
           selectList(parseInt(list_id));
         }
       }
-    }
+    };
 
     async function loadProducts() {
       const listContainer = document.getElementById('productList');
@@ -505,7 +517,7 @@
             ` : product.is_bought ? `
               <p class="text-center text-xs text-slate-500 italic py-1">Réservé par ${product.bought_by || 'un proche'}</p>
             ` : `
-              <button type="button" onclick="markAsBought(${product.id})" class="w-full bg-emerald-600 text-white text-xs font-bold py-2 rounded hover:bg-emerald-700 transition">Offrir cet article</button>
+              <button type="button" onclick="markAsBought(${product.id})" class="w-full bg-emerald-600 text-white text-xs font-bold py-2 rounded hover:bg-emerald-700 transition cursor-pointer">Offrir cet article</button>
             `}
           </div>
         `;
@@ -513,21 +525,21 @@
       });
     }
 
-    async function markAsBought(id) {
+    window.markAsBought = async function(id) {
       if (currentRole === 'admin') return alert("Le créateur ne peut pas réserver les articles de sa propre liste !");
       if (!supabaseClient) return;
       const name = prompt("Votre prénom pour réserver ce cadeau :");
       if (!name) return;
       await supabaseClient.from('products').update({ is_bought: true, bought_by: name }).eq('id', id);
       loadProducts();
-    }
+    };
 
-    async function deleteProduct(id) {
+    window.deleteProduct = async function(id) {
       if (currentRole !== 'admin' || !supabaseClient) return;
       if (!confirm("Supprimer cet article ?")) return;
       await supabaseClient.from('products').delete().eq('id', id);
       loadProducts();
-    }
+    };
   </script>
 </body>
 </html>
