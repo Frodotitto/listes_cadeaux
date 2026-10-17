@@ -121,21 +121,24 @@
     let allLists = [];
     let isQuickAdd = false;
 
+    const QUICK_ADD_TOKEN = '__QUICK_ADD_TOKEN__';
+
     // 1. DÉMARRAGE ET SESSIONS
     window.addEventListener('DOMContentLoaded', () => {
-      try {
-        if (typeof window.supabase !== 'undefined') {
-          supabaseClient = window.supabase.createClient(ACTUAL_URL, ACTUAL_KEY);
-        }
-      } catch(e) {
-        console.error("Erreur d'initialisation Supabase :", e);
-      }
-
       const urlParams = new URLSearchParams(window.location.search);
       isQuickAdd = urlParams.get('quick_add') === 'true';
-
+      const token = urlParams.get('token');
+    
+      // Si le token envoyé par iOS correspond au secret, on déverrouille directement en Créateur
+      if (isQuickAdd && token === QUICK_ADD_TOKEN) {
+        currentRole = 'admin';
+        localStorage.setItem('user_role', 'admin');
+        unlockQuickAddMode();
+        return;
+      }
+    
       const savedRole = localStorage.getItem('user_role');
-
+    
       if (isQuickAdd) {
         if (savedRole === 'admin') {
           currentRole = 'admin';
@@ -145,7 +148,7 @@
         }
         return;
       }
-
+    
       if (savedRole === 'guest' || savedRole === 'admin') {
         currentRole = savedRole;
         unlockSite();
