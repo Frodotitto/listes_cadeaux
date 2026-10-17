@@ -98,7 +98,7 @@
     <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="productList"></section>
   </main>
 
-<script>
+  <script>
     // Configuration Supabase dynamique via GitHub Actions
     const SUPABASE_URL = '__SUPABASE_URL__';
     const SUPABASE_KEY = '__SUPABASE_KEY__';
@@ -179,8 +179,8 @@
     }
 
     function resetRoleSelection() {
-      document.getElementById('roleSelectionStep').classList.remove('hidden');
-      document.getElementById('passwordStep').classList.add('hidden');
+      document.getElementById('roleSelectionStep')?.classList.remove('hidden');
+      document.getElementById('passwordStep')?.classList.add('hidden');
     }
 
     function validatePassword() {
@@ -193,36 +193,36 @@
         if (isQuickAdd) unlockQuickAddMode();
         else unlockSite();
       } else {
-        document.getElementById('authError').classList.remove('hidden');
+        document.getElementById('authError')?.classList.remove('hidden');
       }
     }
 
     function unlockQuickAddMode() {
-      document.getElementById('authModal').classList.add('hidden');
-      document.getElementById('mainHeader').classList.add('hidden');
-      document.getElementById('tabsContainer').classList.add('hidden');
-      document.getElementById('productList').classList.add('hidden');
+      document.getElementById('authModal')?.classList.add('hidden');
+      document.getElementById('mainHeader')?.classList.add('hidden');
+      document.getElementById('tabsContainer')?.classList.add('hidden');
+      document.getElementById('productList')?.classList.add('hidden');
 
-      document.getElementById('appContent').classList.remove('opacity-10', 'pointer-events-none');
-      document.getElementById('adminSection').classList.remove('hidden');
+      document.getElementById('appContent')?.classList.remove('opacity-10', 'pointer-events-none');
+      document.getElementById('adminSection')?.classList.remove('hidden');
       document.getElementById('formHeaderTitle').innerText = "⚡ Ajout rapide iOS";
 
       initApp();
     }
 
     function unlockSite() {
-      document.getElementById('authModal').classList.add('hidden');
-      document.getElementById('appContent').classList.remove('opacity-10', 'pointer-events-none');
+      document.getElementById('authModal')?.classList.add('hidden');
+      document.getElementById('appContent')?.classList.remove('opacity-10', 'pointer-events-none');
       
       const roleBadge = document.getElementById('roleBadge');
       if (currentRole === 'admin') {
         roleBadge.innerText = "Mode Créateur (Surprise préservée)";
         roleBadge.className = "text-indigo-600 text-sm font-bold";
-        document.getElementById('adminSection').classList.remove('hidden');
+        document.getElementById('adminSection')?.classList.remove('hidden');
       } else {
         roleBadge.innerText = "Espace Visiteur / Proches";
         roleBadge.className = "text-slate-500 text-sm";
-        document.getElementById('adminSection').classList.add('hidden');
+        document.getElementById('adminSection')?.classList.add('hidden');
       }
 
       initApp();
@@ -236,7 +236,6 @@
     // 2. INITIALISATION ET EXTRACTION
     async function initApp() {
       await loadLists();
-      if (allLists.length > 0) selectList(allLists[0].id);
 
       const urlParams = new URLSearchParams(window.location.search);
       const addUrl = urlParams.get('add_url');
@@ -279,8 +278,12 @@
         return;
       }
       allLists = lists || [];
+      if (allLists.length > 0 && !currentListId) {
+        currentListId = allLists[0].id;
+      }
       renderTabs();
       updateListDropdown();
+      if (!isQuickAdd && currentListId) loadProducts();
     }
 
     function renderTabs() {
@@ -307,7 +310,11 @@
       }
     }
 
-    function selectList(id) { currentListId = id; renderTabs(); if (!isQuickAdd) loadProducts(); }
+    function selectList(id) { 
+      currentListId = id; 
+      renderTabs(); 
+      if (!isQuickAdd) loadProducts(); 
+    }
 
     async function createNewList() {
       if (!supabaseClient) return alert("Base de données non initialisée.");
@@ -327,9 +334,8 @@
       e.stopPropagation();
       if (!confirm("Supprimer cette liste et ses articles ?")) return;
       await supabaseClient.from('lists').delete().eq('id', id);
+      currentListId = null;
       await loadLists();
-      if (allLists.length > 0) selectList(allLists[0].id);
-      else { currentListId = null; loadProducts(); }
     }
 
     function updateListDropdown() {
@@ -432,11 +438,25 @@
     // 6. AFFICHAGE DES CARTES PRODUITS
     async function loadProducts() {
       const listContainer = document.getElementById('productList');
+      if (!listContainer) return;
       listContainer.innerHTML = '';
-      if (!currentListId || !supabaseClient) return listContainer.innerHTML = '<p class="col-span-full text-center text-slate-400 py-8">Aucune liste.</p>';
 
-      const { data: products } = await supabaseClient.from('products').select('*').eq('list_id', currentListId).order('created_at', { ascending: false });
-      if (!products || products.length === 0) return listContainer.innerHTML = '<p class="col-span-full text-center text-slate-400 py-8 italic">Liste vide.</p>';
+      if (!currentListId || !supabaseClient) {
+        listContainer.innerHTML = '<p class="col-span-full text-center text-slate-400 py-8">Aucune liste sélectionnée.</p>';
+        return;
+      }
+
+      const { data: products, error } = await supabaseClient.from('products').select('*').eq('list_id', currentListId).order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error("Erreur chargement produits :", error);
+        return;
+      }
+
+      if (!products || products.length === 0) {
+        listContainer.innerHTML = '<p class="col-span-full text-center text-slate-400 py-8 italic">Cette liste ne contient aucun article pour le moment.</p>';
+        return;
+      }
 
       products.forEach(product => {
         const isGuest = currentRole === 'guest';
