@@ -133,34 +133,62 @@
 
     // 2. INITIALISATION & RECEPTION DES PARAMETRES (iOS / EXTENSION)
     async function initApp() {
-      try { await loadLists(); } catch (e) { console.error(e); }
+      await loadLists();
       if (allLists.length > 0) selectList(allLists[0].id);
     
-      const params = new URLSearchParams(window.location.search);
-      const addUrl = params.get('add_url');
-      if (!addUrl) return;
+      const urlParams = new URLSearchParams(window.location.search);
+      const addUrl = urlParams.get('add_url');
     
-      // URLSearchParams a déjà décodé : surtout pas de decodeURIComponent en plus
-      document.getElementById('adminSection').classList.remove('hidden');
-      document.getElementById('productUrl').value = addUrl;
+      if (addUrl) {
+        // Si l'utilisateur n'est pas encore identifié en Mode Créateur
+        if (!isAdmin) {
+          const pass = prompt("Article détecté ! Entrez le mot de passe Créateur pour l'ajouter :");
+          if (pass === ADMIN_CODE) {
+            isAdmin = true;
+            document.getElementById('adminSection').classList.remove('hidden');
+            document.getElementById('adminToggleBtn').innerText = "Quitter Mode Créateur";
+            renderTabs();
+            loadProducts();
+          } else {
+            alert("Mot de passe incorrect. L'article n'a pas été pré-rempli.");
+            return;
+          }
+        }
     
-      const jsData = params.get('js_data');
-      if (jsData) {
+        // Pré-remplissage uniquement si le Mode Créateur est validé
+        const decodedUrl = decodeURIComponent(addUrl);
+        document.getElementById('productUrl').value = decodedUrl;
+    
+        const jsDataParam = urlParams.get('js_data');
+        if (jsDataParam) {
+          try {
+            const parsed = JSON.parse(decodeURIComponent(jsDataParam));
+            if (parsed.price) document.getElementById('productPrice').value = parsed.price;
+            if (parsed.title) document.getElementById('productTitle').value = parsed.title;
+          } catch(e) {}
+        }
+    
+        const addPrice = urlParams.get('price');
+        const addTitle = urlParams.get('title');
+    
+        if (addPrice && addPrice !== 'null' && addPrice.trim() !== '') {
+          document.getElementById('productPrice').value = decodeURIComponent(addPrice).trim();
+        }
+        if (addTitle && addTitle !== 'null' && addTitle.trim() !== '') {
+          document.getElementById('productTitle').value = decodeURIComponent(addTitle).trim();
+        }
+    
         try {
-          const parsed = JSON.parse(jsData);
-          if (parsed.price && parsed.price !== 'Non renseigné') {
-            document.getElementById('productPrice').value = parsed.price;
-          }
-          if (parsed.title) {
-            document.getElementById('productTitle').value = parsed.title;
-          }
-          if (parsed.image) {
-            document.getElementById('productImage').value = parsed.image;
-          }
-        } catch (e) {
-          console.error('js_data invalide', e);
+          document.getElementById('productStore').value = new URL(decodedUrl).hostname.replace('www.', '');
+        } catch(e) {}
+    
+        if (document.getElementById('productTitle').value || document.getElementById('productPrice').value) {
+          document.getElementById('fetchStatus').innerText = "✅ Infos extraites depuis Safari iOS !";
+        } else {
+          autoFillFromUrl();
         }
       }
+    }
     
       // Paramètres séparés (extension PC éventuelle)
       const price = params.get('price');
