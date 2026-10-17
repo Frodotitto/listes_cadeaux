@@ -99,15 +99,19 @@
   </main>
 
   <script>
-    // Variables injectées par GitHub Actions au déploiement
-    const SUPABASE_URL = '__SUPABASE_URL__';
-    const SUPABASE_KEY = '__SUPABASE_KEY__';
-    const ACCESS_CODE_GUEST = '__GUEST_PASSWORD__';
-    const ACCESS_CODE_ADMIN = '__ADMIN_PASSWORD__';
-    const QUICK_ADD_TOKEN = '__QUICK_ADD_TOKEN__';
+    // Variables injectées par GitHub Actions (forcées en String avec des guillemets)
+    const SUPABASE_URL = "__SUPABASE_URL__";
+    const SUPABASE_KEY = "__SUPABASE_KEY__";
+    const ACCESS_CODE_GUEST = "__GUEST_PASSWORD__";
+    const ACCESS_CODE_ADMIN = "__ADMIN_PASSWORD__";
+    const QUICK_ADD_TOKEN = "__QUICK_ADD_TOKEN__";
 
-    // Nettoyage des chaînes injectées
-    const getSecret = (val) => (val && typeof val === 'string' && !val.startsWith('__')) ? val.trim() : '';
+    // Nettoyage sécurisé
+    function getSecret(val) {
+      if (!val) return "";
+      const str = String(val).trim();
+      return str.startsWith("__") ? "" : str;
+    }
 
     const ACTUAL_URL = getSecret(SUPABASE_URL);
     const ACTUAL_KEY = getSecret(SUPABASE_KEY);
@@ -122,8 +126,8 @@
     let allLists = [];
     let isQuickAdd = false;
 
-    // Attachement global des handlers pour assurer la réactivité des clics
-    window.selectRole = function(role) {
+    // Fonctions globales pour la modale
+    function selectRole(role) {
       selectedRole = role;
       
       const roleStep = document.getElementById('roleSelectionStep');
@@ -147,20 +151,20 @@
       if (passInput) {
         setTimeout(() => passInput.focus(), 100);
       }
-    };
+    }
 
-    window.resetRoleSelection = function() {
+    function resetRoleSelection() {
       const roleStep = document.getElementById('roleSelectionStep');
       const passStep = document.getElementById('passwordStep');
       if (roleStep) roleStep.classList.remove('hidden');
       if (passStep) passStep.classList.add('hidden');
-    };
+    }
 
-    window.validatePassword = function() {
+    function validatePassword() {
       const input = document.getElementById('passInput').value.trim();
       const expectedCode = selectedRole === 'guest' ? ACTUAL_GUEST_PASS : ACTUAL_ADMIN_PASS;
 
-      if (expectedCode !== '' && input === expectedCode) {
+      if (expectedCode !== "" && input === expectedCode) {
         currentRole = selectedRole;
         localStorage.setItem('user_role', currentRole);
         if (isQuickAdd) unlockQuickAddMode();
@@ -169,12 +173,12 @@
         const errorEl = document.getElementById('authError');
         if (errorEl) errorEl.classList.remove('hidden');
       }
-    };
+    }
 
-    window.logout = function() {
+    function logout() {
       localStorage.removeItem('user_role');
       window.location.href = window.location.pathname;
-    };
+    }
 
     function unlockQuickAddMode() {
       const modal = document.getElementById('authModal');
@@ -222,8 +226,6 @@
       try {
         if (typeof window.supabase !== 'undefined' && ACTUAL_URL && ACTUAL_KEY) {
           supabaseClient = window.supabase.createClient(ACTUAL_URL, ACTUAL_KEY);
-        } else {
-          console.warn("Clés Supabase non disponibles.");
         }
       } catch(e) {
         console.error("Erreur d'initialisation Supabase :", e);
@@ -233,7 +235,6 @@
       isQuickAdd = urlParams.get('quick_add') === 'true';
       const tokenParam = urlParams.get('token');
 
-      // Déverrouillage automatique si token valide
       if (isQuickAdd && tokenParam && ACTUAL_QUICK_TOKEN && tokenParam === ACTUAL_QUICK_TOKEN) {
         currentRole = 'admin';
         localStorage.setItem('user_role', 'admin');
@@ -248,7 +249,7 @@
           currentRole = 'admin';
           unlockQuickAddMode();
         } else {
-          window.selectRole('admin');
+          selectRole('admin');
         }
         return;
       }
@@ -354,14 +355,14 @@
       if (data && data[0]) selectList(data[0].id);
     }
 
-    window.deleteList = async function(e, id) {
+    async function deleteList(e, id) {
       if (!supabaseClient) return;
       e.stopPropagation();
       if (!confirm("Supprimer cette liste et ses articles ?")) return;
       await supabaseClient.from('lists').delete().eq('id', id);
       currentListId = null;
       await loadLists();
-    };
+    }
 
     function updateListDropdown() {
       const select = document.getElementById('formListSelect');
@@ -385,7 +386,7 @@
       });
     }
 
-    window.autoFillFromUrl = async function() {
+    async function autoFillFromUrl() {
       const url = document.getElementById('productUrl').value.trim();
       const status = document.getElementById('fetchStatus');
       if (!url) return;
@@ -419,9 +420,9 @@
       } catch (err) {
         status.innerText = "⚠️ Détection automatique partielle. Complétez si besoin.";
       }
-    };
+    }
 
-    window.saveProduct = async function() {
+    async function saveProduct() {
       if (currentRole !== 'admin') return alert("Action réservée au créateur.");
       if (!supabaseClient) return alert("Base de données non connectée.");
 
@@ -465,7 +466,7 @@
           selectList(parseInt(list_id));
         }
       }
-    };
+    }
 
     async function loadProducts() {
       const listContainer = document.getElementById('productList');
@@ -526,21 +527,21 @@
       });
     }
 
-    window.markAsBought = async function(id) {
+    async function markAsBought(id) {
       if (currentRole === 'admin') return alert("Le créateur ne peut pas réserver les articles de sa propre liste !");
       if (!supabaseClient) return;
       const name = prompt("Votre prénom pour réserver ce cadeau :");
       if (!name) return;
       await supabaseClient.from('products').update({ is_bought: true, bought_by: name }).eq('id', id);
       loadProducts();
-    };
+    }
 
-    window.deleteProduct = async function(id) {
+    async function deleteProduct(id) {
       if (currentRole !== 'admin' || !supabaseClient) return;
       if (!confirm("Supprimer cet article ?")) return;
       await supabaseClient.from('products').delete().eq('id', id);
       loadProducts();
-    };
+    }
   </script>
 </body>
 </html>
