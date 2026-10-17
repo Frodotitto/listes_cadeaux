@@ -99,13 +99,18 @@
   </main>
 
   <script>
-    // Configuration Supabase dynamique via GitHub Actions
+    // Variables injectées dynamiquement via GitHub Actions
     const SUPABASE_URL = '__SUPABASE_URL__';
     const SUPABASE_KEY = '__SUPABASE_KEY__';
-    
-    // Mots de passe injectés dynamiquement via GitHub Actions
     const ACCESS_CODE_GUEST = '__GUEST_PASSWORD__';
     const ACCESS_CODE_ADMIN = '__ADMIN_PASSWORD__';
+    const QUICK_ADD_TOKEN = '__QUICK_ADD_TOKEN__';
+
+    // Fallbacks de secours pour l'exécution locale
+    const ACTUAL_URL = (SUPABASE_URL && !SUPABASE_URL.startsWith('__')) ? SUPABASE_URL : 'https://glufuwoyxbyljnnthmbq.supabase.co';
+    const ACTUAL_KEY = (SUPABASE_KEY && !SUPABASE_KEY.startsWith('__')) ? SUPABASE_KEY : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdsdWZ1d295eGJ5bGpubnRobWJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3MTg4MjUsImV4cCI6MjE0NzI5NDgyNX0.Zi64NJ2qr07oZMCA8acwmD8f1fEP6NJN_DyO5IvrIUc';
+    const ACTUAL_GUEST_PASS = (ACCESS_CODE_GUEST && !ACCESS_CODE_GUEST.startsWith('__')) ? ACCESS_CODE_GUEST : '1234';
+    const ACTUAL_ADMIN_PASS = (ACCESS_CODE_ADMIN && !ACCESS_CODE_ADMIN.startsWith('__')) ? ACCESS_CODE_ADMIN : '5678';
 
     let supabaseClient = null;
     let selectedRole = null;
@@ -114,24 +119,29 @@
     let allLists = [];
     let isQuickAdd = false;
 
-    const QUICK_ADD_TOKEN = '__QUICK_ADD_TOKEN__';
-
-    // 1. DÉMARRAGE ET SESSIONS
     window.addEventListener('DOMContentLoaded', () => {
+      try {
+        if (typeof window.supabase !== 'undefined') {
+          supabaseClient = window.supabase.createClient(ACTUAL_URL, ACTUAL_KEY);
+        }
+      } catch(e) {
+        console.error("Erreur d'initialisation Supabase :", e);
+      }
+
       const urlParams = new URLSearchParams(window.location.search);
       isQuickAdd = urlParams.get('quick_add') === 'true';
-      const token = urlParams.get('token');
-    
-      // Si le token envoyé par iOS correspond au secret, on déverrouille directement en Créateur
-      if (isQuickAdd && token === QUICK_ADD_TOKEN) {
+      const tokenParam = urlParams.get('token');
+
+      // Si le token transmis dans l'URL correspond au secret, déverrouillage automatique
+      if (isQuickAdd && tokenParam && QUICK_ADD_TOKEN && tokenParam === QUICK_ADD_TOKEN) {
         currentRole = 'admin';
         localStorage.setItem('user_role', 'admin');
         unlockQuickAddMode();
         return;
       }
-    
+
       const savedRole = localStorage.getItem('user_role');
-    
+
       if (isQuickAdd) {
         if (savedRole === 'admin') {
           currentRole = 'admin';
@@ -141,7 +151,7 @@
         }
         return;
       }
-    
+
       if (savedRole === 'guest' || savedRole === 'admin') {
         currentRole = savedRole;
         unlockSite();
@@ -166,7 +176,7 @@
         document.getElementById('passwordSubtitle').innerText = "Entrez le mot de passe reçu pour consulter la liste.";
       } else {
         document.getElementById('passwordTitle').innerText = "Accès Créateur";
-        document.getElementById('passwordSubtitle').innerText = "Entrez votre mot de passe créateur pour ajouter/gérer les articles.";
+        document.getElementById('passwordSubtitle').innerText = "Entrez votre mot de passe créateur pour gérer les articles.";
       }
 
       if (passInput) {
@@ -229,7 +239,6 @@
       window.location.href = window.location.pathname;
     }
 
-    // 2. INITIALISATION ET EXTRACTION
     async function initApp() {
       await loadLists();
 
@@ -237,7 +246,11 @@
       const addUrl = urlParams.get('add_url');
 
       if (addUrl) {
-        const decodedUrl = decodeURIComponent(addUrl);
+        let decodedUrl = decodeURIComponent(addUrl);
+        if (!decodedUrl.startsWith('http://') && !decodedUrl.startsWith('https://')) {
+          decodedUrl = 'https://' + decodedUrl.replace(/^%2f|\/+/i, '');
+        }
+
         document.getElementById('productUrl').value = decodedUrl;
 
         const jsDataParam = urlParams.get('js_data');
@@ -265,7 +278,6 @@
       }
     }
 
-    // 3. CHARGEMENT ET ONGLETS
     async function loadLists() {
       if (!supabaseClient) return;
       const { data: lists, error } = await supabaseClient.from('lists').select('*').order('id', { ascending: true });
@@ -317,10 +329,7 @@
       const name = prompt("Nom de la liste (ex: Naissance, Crémaillère) :");
       if (!name) return;
       const { data, error } = await supabaseClient.from('lists').insert([{ name }]).select();
-      if (error) {
-        alert("Erreur création liste : " + error.message);
-        return;
-      }
+      if (error) return alert("Erreur création liste : " + error.message);
       await loadLists();
       if (data && data[0]) selectList(data[0].id);
     }
@@ -338,15 +347,6 @@
       const select = document.getElementById('formListSelect');
       if (!select) return;
       select.innerHTML = '';
-    
-      if (allLists.length === 0) {
-        const opt = document.createElement('option');
-        opt.value = '';
-        opt.innerText = '-- Aucune liste disponible (Créez-en une) --';
-        select.appendChild(opt);
-        return;
-      }
-    
       allLists.forEach(l => {
         const opt = document.createElement('option');
         opt.value = l.id;
@@ -356,7 +356,6 @@
       });
     }
 
-    // 4. EXTRACTION AVEC TIMEOUT DE SÉCURITÉ
     async function autoFillFromUrl() {
       const url = document.getElementById('productUrl').value.trim();
       const status = document.getElementById('fetchStatus');
@@ -393,7 +392,6 @@
       }
     }
 
-    // 5. SAUVEGARDE PRODUIT
     async function saveProduct() {
       if (currentRole !== 'admin') return alert("Action réservée au créateur.");
       if (!supabaseClient) return alert("Base de données non connectée.");
@@ -440,7 +438,6 @@
       }
     }
 
-    // 6. AFFICHAGE DES CARTES PRODUITS
     async function loadProducts() {
       const listContainer = document.getElementById('productList');
       if (!listContainer) return;
