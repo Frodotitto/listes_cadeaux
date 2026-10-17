@@ -342,6 +342,15 @@
       const select = document.getElementById('formListSelect');
       if (!select) return;
       select.innerHTML = '';
+    
+      if (allLists.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.innerText = '-- Aucune liste disponible (Créez-en une) --';
+        select.appendChild(opt);
+        return;
+      }
+    
       allLists.forEach(l => {
         const opt = document.createElement('option');
         opt.value = l.id;
