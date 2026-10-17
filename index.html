@@ -106,7 +106,7 @@
     const ACCESS_CODE_ADMIN = '__ADMIN_PASSWORD__';
     const QUICK_ADD_TOKEN = '__QUICK_ADD_TOKEN__';
 
-    // Fonction de vérification des secrets injectés
+    // Nettoyage des chaînes injectées
     const getSecret = (val) => (val && typeof val === 'string' && !val.startsWith('__')) ? val.trim() : '';
 
     const ACTUAL_URL = getSecret(SUPABASE_URL);
@@ -122,47 +122,7 @@
     let allLists = [];
     let isQuickAdd = false;
 
-    window.addEventListener('DOMContentLoaded', () => {
-      try {
-        if (typeof window.supabase !== 'undefined' && ACTUAL_URL && ACTUAL_KEY) {
-          supabaseClient = window.supabase.createClient(ACTUAL_URL, ACTUAL_KEY);
-        } else {
-          console.warn("Clés Supabase manquantes ou non injectées.");
-        }
-      } catch(e) {
-        console.error("Erreur d'initialisation Supabase :", e);
-      }
-
-      const urlParams = new URLSearchParams(window.location.search);
-      isQuickAdd = urlParams.get('quick_add') === 'true';
-      const tokenParam = urlParams.get('token');
-
-      // Déverrouillage automatique si token iOS valide
-      if (isQuickAdd && tokenParam && ACTUAL_QUICK_TOKEN && tokenParam === ACTUAL_QUICK_TOKEN) {
-        currentRole = 'admin';
-        localStorage.setItem('user_role', 'admin');
-        unlockQuickAddMode();
-        return;
-      }
-
-      const savedRole = localStorage.getItem('user_role');
-
-      if (isQuickAdd) {
-        if (savedRole === 'admin') {
-          currentRole = 'admin';
-          unlockQuickAddMode();
-        } else {
-          window.selectRole('admin');
-        }
-        return;
-      }
-
-      if (savedRole === 'guest' || savedRole === 'admin') {
-        currentRole = savedRole;
-        unlockSite();
-      }
-    });
-
+    // Attachement global des handlers pour assurer la réactivité des clics
     window.selectRole = function(role) {
       selectedRole = role;
       
@@ -211,6 +171,11 @@
       }
     };
 
+    window.logout = function() {
+      localStorage.removeItem('user_role');
+      window.location.href = window.location.pathname;
+    };
+
     function unlockQuickAddMode() {
       const modal = document.getElementById('authModal');
       const appContent = document.getElementById('appContent');
@@ -253,10 +218,46 @@
       initApp();
     }
 
-    window.logout = function() {
-      localStorage.removeItem('user_role');
-      window.location.href = window.location.pathname;
-    };
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        if (typeof window.supabase !== 'undefined' && ACTUAL_URL && ACTUAL_KEY) {
+          supabaseClient = window.supabase.createClient(ACTUAL_URL, ACTUAL_KEY);
+        } else {
+          console.warn("Clés Supabase non disponibles.");
+        }
+      } catch(e) {
+        console.error("Erreur d'initialisation Supabase :", e);
+      }
+
+      const urlParams = new URLSearchParams(window.location.search);
+      isQuickAdd = urlParams.get('quick_add') === 'true';
+      const tokenParam = urlParams.get('token');
+
+      // Déverrouillage automatique si token valide
+      if (isQuickAdd && tokenParam && ACTUAL_QUICK_TOKEN && tokenParam === ACTUAL_QUICK_TOKEN) {
+        currentRole = 'admin';
+        localStorage.setItem('user_role', 'admin');
+        unlockQuickAddMode();
+        return;
+      }
+
+      const savedRole = localStorage.getItem('user_role');
+
+      if (isQuickAdd) {
+        if (savedRole === 'admin') {
+          currentRole = 'admin';
+          unlockQuickAddMode();
+        } else {
+          window.selectRole('admin');
+        }
+        return;
+      }
+
+      if (savedRole === 'guest' || savedRole === 'admin') {
+        currentRole = savedRole;
+        unlockSite();
+      }
+    });
 
     async function initApp() {
       await loadLists();
@@ -499,7 +500,7 @@
             <div class="h-48 overflow-hidden bg-slate-100 relative">
               <img src="${product.image_url}" alt="${product.title}" class="w-full h-full object-contain p-2">
               ${showBoughtStatus ? '<span class="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded font-bold">🎁 Déjà offert</span>' : ''}
-              ${currentRole === 'admin' ? `<button type="button" onclick="deleteProduct(${product.id})" class="absolute top-2 right-2 bg-slate-800 bg-opacity-70 text-white p-1.5 rounded-full hover:bg-red-600 transition text-xs">🗑️</button>` : ''}
+              ${currentRole === 'admin' ? `<button type="button" onclick="deleteProduct(${product.id})" class="absolute top-2 right-2 bg-slate-800 bg-opacity-70 text-white p-1.5 rounded-full hover:bg-red-600 transition text-xs cursor-pointer">🗑️</button>` : ''}
             </div>
             <div class="p-4">
               <span class="text-xs font-semibold text-indigo-500 uppercase tracking-wider">${product.store_name}</span>
