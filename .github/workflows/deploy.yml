@@ -25,12 +25,18 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Inject Secrets into index.html
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          GUEST_PASSWORD: ${{ secrets.GUEST_PASSWORD }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          QUICK_ADD_TOKEN: ${{ secrets.QUICK_ADD_TOKEN }}
         run: |
-          sed -i 's|__SUPABASE_URL__|${{ secrets.SUPABASE_URL }}|g' index.html
-          sed -i 's|__SUPABASE_KEY__|${{ secrets.SUPABASE_KEY }}|g' index.html
-          sed -i 's|__GUEST_PASSWORD__|${{ secrets.GUEST_PASSWORD }}|g' index.html
-          sed -i 's|__ADMIN_PASSWORD__|${{ secrets.ADMIN_PASSWORD }}|g' index.html
-          sed -i 's|__QUICK_ADD_TOKEN__|${{ secrets.QUICK_ADD_TOKEN }}|g' index.html
+          sed -i "s|__SUPABASE_URL__|$SUPABASE_URL|g" index.html
+          sed -i "s|__SUPABASE_KEY__|$SUPABASE_KEY|g" index.html
+          sed -i "s|__GUEST_PASSWORD__|$GUEST_PASSWORD|g" index.html
+          sed -i "s|__ADMIN_PASSWORD__|$ADMIN_PASSWORD|g" index.html
+          sed -i "s|__QUICK_ADD_TOKEN__|$QUICK_ADD_TOKEN|g" index.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
