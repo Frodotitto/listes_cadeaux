@@ -51,7 +51,7 @@
   </div>
 
   <main id="appContent" class="max-w-4xl mx-auto opacity-10 pointer-events-none transition-opacity duration-300">
-    <header class="flex justify-between items-center mb-6 border-b pb-4">
+    <header class="flex justify-between items-center mb-6 border-b pb-4" id="mainHeader">
       <div>
         <h1 class="text-3xl font-extrabold text-indigo-600">Mes Envies 🎁</h1>
         <p class="text-slate-500 text-sm" id="roleBadge">Chargement...</p>
@@ -61,9 +61,9 @@
       </button>
     </header>
 
-    <!-- Formulaire d'ajout (Réservé au Mode Créateur) -->
+    <!-- Formulaire d'ajout (Créateur / Mode Quick Add) -->
     <section id="adminSection" class="hidden bg-white p-6 rounded-xl shadow-sm border mb-8">
-      <h2 class="text-lg font-bold mb-4 text-slate-700">➕ Ajouter un article</h2>
+      <h2 class="text-lg font-bold mb-4 text-slate-700" id="formHeaderTitle">➕ Ajouter un article</h2>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <div>
           <label class="block text-xs font-semibold text-slate-500 mb-1">Liste destination :</label>
@@ -100,26 +100,34 @@
 
   <script>
     const SUPABASE_URL = 'https://glufuwoyxbyljnnthmbq.supabase.co';
-    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdsdWZ1d295eGJ5bGpubnRobWJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3MTg4MjUsImV4cCI6MjEwNzI5NDgyNX0.Zi64NJ2qr07oZMCA8acwmD8f1fEP6NJN_DyO5IvrIUc';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdsdWZ1d295eGJ5bGpubnRobWJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3MTg4MjUsImV4cCI6MjE0NzI5NDgyNX0.Zi64NJ2qr07oZMCA8acwmD8f1fEP6NJN_DyO5IvrIUc';
     
     // Mots de passe
-    const ACCESS_CODE_GUEST = '1234';  // Mot de passe Visiteur
-    const ACCESS_CODE_ADMIN = '5678';  // Mot de passe Créateur
+    const ACCESS_CODE_GUEST = '1234';  // Visiteur
+    const ACCESS_CODE_ADMIN = '5678';  // Créateur
 
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     let selectedRole = null;
     let currentRole = null;
     let currentListId = null;
     let allLists = [];
+    let isQuickAdd = false;
 
     // 1. DÉMARRAGE ET SESSIONS
     window.addEventListener('DOMContentLoaded', () => {
-      const savedRole = localStorage.getItem('user_role');
       const urlParams = new URLSearchParams(window.location.search);
-      const hasAddUrl = urlParams.get('add_url');
+      isQuickAdd = urlParams.get('quick_add') === 'true';
 
-      if (hasAddUrl && savedRole !== 'admin') {
-        selectRole('admin');
+      const savedRole = localStorage.getItem('user_role');
+
+      // Si c'est un ajout rapide depuis iOS
+      if (isQuickAdd) {
+        if (savedRole === 'admin') {
+          currentRole = 'admin';
+          unlockQuickAddMode();
+        } else {
+          selectRole('admin');
+        }
         return;
       }
 
@@ -159,10 +167,24 @@
       if (input === expectedCode) {
         currentRole = selectedRole;
         localStorage.setItem('user_role', currentRole);
-        unlockSite();
+        if (isQuickAdd) unlockQuickAddMode();
+        else unlockSite();
       } else {
         document.getElementById('authError').classList.remove('hidden');
       }
+    }
+
+    function unlockQuickAddMode() {
+      document.getElementById('authModal').classList.add('hidden');
+      document.getElementById('mainHeader').classList.add('hidden');
+      document.getElementById('tabsContainer').classList.add('hidden');
+      document.getElementById('productList').classList.add('hidden');
+
+      document.getElementById('appContent').classList.remove('opacity-10', 'pointer-events-none');
+      document.getElementById('adminSection').classList.remove('hidden');
+      document.getElementById('formHeaderTitle').innerText = "⚡ Ajout rapide iOS";
+
+      initApp();
     }
 
     function unlockSite() {
@@ -188,7 +210,7 @@
       window.location.href = window.location.pathname;
     }
 
-    // 2. INITIALISATION ET RÉCEPTION DES LIENS (iOS / EXTENSION)
+    // 2. INITIALISATION ET EXTRACTION
     async function initApp() {
       await loadLists();
       if (allLists.length > 0) selectList(allLists[0].id);
@@ -197,11 +219,6 @@
       const addUrl = urlParams.get('add_url');
 
       if (addUrl) {
-        if (currentRole !== 'admin') {
-          alert("Avis : Seul le Créateur peut ajouter des articles à la liste.");
-          return;
-        }
-
         const decodedUrl = decodeURIComponent(addUrl);
         document.getElementById('productUrl').value = decodedUrl;
 
@@ -211,25 +228,19 @@
             const parsed = JSON.parse(decodeURIComponent(jsDataParam));
             if (parsed.price) document.getElementById('productPrice').value = parsed.price;
             if (parsed.title) document.getElementById('productTitle').value = parsed.title;
+            if (parsed.image) document.getElementById('productImage').value = parsed.image;
+            if (parsed.store) document.getElementById('productStore').value = parsed.store;
           } catch(e) {}
         }
 
-        const addPrice = urlParams.get('price');
-        const addTitle = urlParams.get('title');
-
-        if (addPrice && addPrice !== 'null' && addPrice.trim() !== '') {
-          document.getElementById('productPrice').value = decodeURIComponent(addPrice).trim();
-        }
-        if (addTitle && addTitle !== 'null' && addTitle.trim() !== '') {
-          document.getElementById('productTitle').value = decodeURIComponent(addTitle).trim();
-        }
-
         try {
-          document.getElementById('productStore').value = new URL(decodedUrl).hostname.replace('www.', '');
+          if (!document.getElementById('productStore').value) {
+            document.getElementById('productStore').value = new URL(decodedUrl).hostname.replace('www.', '');
+          }
         } catch(e) {}
 
         if (document.getElementById('productTitle').value || document.getElementById('productPrice').value) {
-          document.getElementById('fetchStatus').innerText = "✅ Infos extraites depuis Safari iOS !";
+          document.getElementById('fetchStatus').innerText = "✅ Informations extraites de la page !";
         } else {
           autoFillFromUrl();
         }
@@ -266,7 +277,7 @@
       }
     }
 
-    function selectList(id) { currentListId = id; renderTabs(); loadProducts(); }
+    function selectList(id) { currentListId = id; renderTabs(); if (!isQuickAdd) loadProducts(); }
 
     async function createNewList() {
       const name = prompt("Nom de la liste (ex: Naissance, Crémaillère) :");
@@ -368,12 +379,16 @@
       if (error) {
         alert("Erreur Supabase : " + error.message);
       } else {
-        const fields = ['productUrl', 'productTitle', 'productPrice', 'productStore', 'productImage'];
-        fields.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-        document.getElementById('fetchStatus').innerText = '';
-        
-        window.history.replaceState({}, document.title, window.location.pathname);
-        selectList(parseInt(list_id));
+        if (isQuickAdd) {
+          alert("🎉 Article ajouté avec succès à la liste !");
+          window.location.href = window.location.pathname; // Redirection vers le site classique
+        } else {
+          const fields = ['productUrl', 'productTitle', 'productPrice', 'productStore', 'productImage'];
+          fields.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+          document.getElementById('fetchStatus').innerText = '';
+          window.history.replaceState({}, document.title, window.location.pathname);
+          selectList(parseInt(list_id));
+        }
       }
     }
 
