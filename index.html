@@ -99,21 +99,21 @@
   </main>
 
   <script>
-    // Secrets injectés directement par GitHub Actions
+    // Variables injectées exclusivement par GitHub Actions au moment du déploiement
     const SUPABASE_URL = '__SUPABASE_URL__';
     const SUPABASE_KEY = '__SUPABASE_KEY__';
     const ACCESS_CODE_GUEST = '__GUEST_PASSWORD__';
     const ACCESS_CODE_ADMIN = '__ADMIN_PASSWORD__';
     const QUICK_ADD_TOKEN = '__QUICK_ADD_TOKEN__';
 
-    // Vérification de présence des secrets
-    const IS_INJECTED = (val) => val && !val.startsWith('__');
+    // Fonction de nettoyage des balises
+    const getSecret = (val) => (val && typeof val === 'string' && !val.startsWith('__')) ? val.trim() : '';
 
-    const ACTUAL_URL = IS_INJECTED(SUPABASE_URL) ? SUPABASE_URL : null;
-    const ACTUAL_KEY = IS_INJECTED(SUPABASE_KEY) ? SUPABASE_KEY : null;
-    const ACTUAL_GUEST_PASS = IS_INJECTED(ACCESS_CODE_GUEST) ? ACCESS_CODE_GUEST : null;
-    const ACTUAL_ADMIN_PASS = IS_INJECTED(ACCESS_CODE_ADMIN) ? ACCESS_CODE_ADMIN : null;
-    const ACTUAL_QUICK_TOKEN = IS_INJECTED(QUICK_ADD_TOKEN) ? QUICK_ADD_TOKEN : null;
+    const ACTUAL_URL = getSecret(SUPABASE_URL);
+    const ACTUAL_KEY = getSecret(SUPABASE_KEY);
+    const ACTUAL_GUEST_PASS = getSecret(ACCESS_CODE_GUEST);
+    const ACTUAL_ADMIN_PASS = getSecret(ACCESS_CODE_ADMIN);
+    const ACTUAL_QUICK_TOKEN = getSecret(QUICK_ADD_TOKEN);
 
     let supabaseClient = null;
     let selectedRole = null;
@@ -127,7 +127,7 @@
         if (typeof window.supabase !== 'undefined' && ACTUAL_URL && ACTUAL_KEY) {
           supabaseClient = window.supabase.createClient(ACTUAL_URL, ACTUAL_KEY);
         } else {
-          console.error("Supabase SDK absent ou clés d'environnement non injectées.");
+          console.warn("Clés Supabase manquantes ou invalides.");
         }
       } catch(e) {
         console.error("Erreur d'initialisation Supabase :", e);
@@ -137,7 +137,7 @@
       isQuickAdd = urlParams.get('quick_add') === 'true';
       const tokenParam = urlParams.get('token');
 
-      // Déverrouillage automatique si token de raccourci valide
+      // Déverrouillage automatique si token iOS valide fourni
       if (isQuickAdd && tokenParam && ACTUAL_QUICK_TOKEN && tokenParam === ACTUAL_QUICK_TOKEN) {
         currentRole = 'admin';
         localStorage.setItem('user_role', 'admin');
@@ -198,13 +198,15 @@
       const input = document.getElementById('passInput').value.trim();
       const expectedCode = selectedRole === 'guest' ? ACTUAL_GUEST_PASS : ACTUAL_ADMIN_PASS;
 
-      if (expectedCode && input === expectedCode) {
+      // Un mot de passe valide et non vide doit impérativement correspondre à la valeur injectée
+      if (expectedCode !== '' && input === expectedCode) {
         currentRole = selectedRole;
         localStorage.setItem('user_role', currentRole);
         if (isQuickAdd) unlockQuickAddMode();
         else unlockSite();
       } else {
-        document.getElementById('authError')?.classList.remove('hidden');
+        const errorEl = document.getElementById('authError');
+        if (errorEl) errorEl.classList.remove('hidden');
       }
     }
 
