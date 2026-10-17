@@ -1,19 +1,21 @@
 /*
- * extract.js : extraction universelle (prix, titre, image) d'une page produit.
+ * extract.js : extraction universelle (prix, titre, image, marchand) d'une page produit.
  *
  * Un seul fichier pour les deux usages :
  *  - iPhone : à coller tel quel dans « Exécuter JavaScript sur la page web » (Raccourcis).
  *             Il renvoie {"url": "..."} via completion().
  *  - PC     : injecté par l'extension avec
  *             chrome.scripting.executeScript({ target: { tabId }, files: ['extract.js'] })
- *             Il renvoie directement l'objet {price, title, image, src}.
+ *             Il renvoie directement l'objet {price, title, image, store, src}.
  */
 (function () {
   var BASE = 'https://frodotitto.github.io/listes_cadeaux/';
 
   function extractProduct() {
     var src = {};
-    var isAmazon = /(^|\.)amazon\./i.test(location.hostname);
+    var hostname = location.hostname;
+    var isAmazon = /(^|\.)amazon\./i.test(hostname);
+    var isFnac = /(^|\.)fnac\./i.test(hostname);
     var junk = /(sprite|logo|icon|loader|spinner|placeholder|blank|pixel|spacer|avatar|badge|flag|\.svg(\?|$))/i;
 
     // ---------- Utilitaires ----------
@@ -73,6 +75,7 @@
       }
       return false;
     }
+
     // Premier élément non barré dont le texte contient un chiffre
     function firstPrice(sels) {
       for (var i = 0; i < sels.length; i++) {
@@ -128,7 +131,7 @@
       }
       if (typeof o !== 'object') return null;
       var p = o.price || o.lowPrice;
-      if (p) return { p: String(p), c: o.priceCurrency || '' };
+      if (p !== undefined && p !== null && p !== '') return { p: String(p), c: o.priceCurrency || '' };
       if (o['@id'] && byId[o['@id']] && byId[o['@id']] !== o) {
         var rr = priceFromOffer(byId[o['@id']]);
         if (rr) return rr;
@@ -182,8 +185,17 @@
 
     // ---------- PRIX ----------
     var price = run([
-      // 1. Sélecteurs très précis de grandes boutiques
+      // 1. Sélecteurs très précis des grandes enseignes (Fnac, Amazon, etc.)
       ['known', function () {
+        if (isFnac) {
+          var fnacEl = document.querySelector('.f-priceBox__price') ||
+                       document.querySelector('.f-buyBox-availabilityOffer .price') ||
+                       document.querySelector('.priceText');
+          if (fnacEl) {
+            var rawT = fnacEl.innerText.replace(/[^\d,\.]/g, '').trim();
+            if (rawT) return rawT.replace('.', ',') + ' €';
+          }
+        }
         return firstPrice([
           '#apex-pricetopay-accessibility-label',
           '.apexPriceToPay .a-offscreen',
@@ -197,7 +209,7 @@
           '[data-automation-id="product-price"]'
         ]);
       }],
-      // 2. Données structurées
+      // 2. Données structurées JSON-LD
       ['ld', function () {
         for (var i = 0; i < ldNodes.length; i++) {
           if (ldNodes[i].offers) {
@@ -207,7 +219,7 @@
         }
         return '';
       }],
-      // 3. JSON-LD illisible : on cherche le prix dans le texte brut
+      // 3. JSON-LD brut via regex
       ['ld-regex', function () {
         for (var i = 0; i < ldRaw.length; i++) {
           var m = ldRaw[i].match(/"(?:price|lowPrice)"\s*:\s*"?(\d[\d.,]*)"?/);
@@ -218,7 +230,7 @@
         }
         return '';
       }],
-      // 4. Balises meta
+      // 4. Balises Meta (OpenGraph & Schema)
       ['meta', function () {
         var v = meta('meta[property="product:price:amount"]') ||
                 meta('meta[property="og:price:amount"]') ||
@@ -229,7 +241,7 @@
                 meta('meta[itemprop="priceCurrency"]');
         return fmtRaw(v, c);
       }],
-      // 5. Microdonnées
+      // 5. Microdonnées HTML
       ['microdata', function () {
         var e = document.querySelector('[itemprop="price"]');
         if (!e) return '';
@@ -239,30 +251,26 @@
         var c = ce ? clean(ce.getAttribute('content') || ce.textContent) : '';
         return fmtRaw(v, c);
       }],
-      // 6. Sélecteurs des CMS courants (WooCommerce, Shopify, PrestaShop, Magento)
+      // 6. Sélecteurs CMS (WooCommerce, Shopify, PrestaShop, Magento)
       ['cms', function () {
         return firstPrice([
-          // WooCommerce
           '.summary .woocommerce-Price-amount',
           '.entry-summary .woocommerce-Price-amount',
           'p.price .woocommerce-Price-amount',
           '.price .woocommerce-Price-amount',
-          // Shopify
           '.price-item--sale',
           '.price__current .price-item',
           '.price-item--regular',
           '[data-product-price]',
           '.product__price',
-          // PrestaShop
           '.current-price-value',
           '.product-price',
-          // Magento
           '[data-price-type="finalPrice"] .price',
           '.price-final_price .price',
           '.special-price .price'
         ]);
       }],
-      // 7. Dernier recours : élément visible dont le texte est uniquement un prix, le plus proche du titre
+      // 7. Heuristique visuelle de secours
       ['heuristic', function () {
         var re = /^\s*(?:(?:dès|à partir de|from)\s*)?(?:[€$£]\s?\d[\d\s\u00a0.,]*|\d[\d\s\u00a0.,]*\s?(?:€|EUR|\$|£))\s*(?:TTC|HT)?\s*$/i;
         var all = document.body.getElementsByTagName('*');
@@ -374,7 +382,7 @@
     ], 'image');
 
     // ---------- TITRE ----------
-    var title = run([
+    var rawTitle = run([
       ['amazon', function () {
         return isAmazon ? (txt('#productTitle') || txt('#title')) : '';
       }],
@@ -401,16 +409,21 @@
       }]
     ], 'title') || clean(document.title);
 
+    // Nettoyage des suffixes de titres
+    var title = rawTitle.replace(/\s*[\-\|]\s*(Amazon|Fnac|Darty|Cdiscount|Boulanger|Vinted).*$/i, '').trim();
+
     // ---------- MARCHAND ----------
-    var store = clean(meta('meta[property="og:site_name"]')) || location.hostname.replace(/^www\./, '');
+    var store = clean(meta('meta[property="og:site_name"]')) || hostname.replace(/^www\./, '');
     if (isAmazon) {
-      store = location.hostname.replace(/^www\./, '');
+      store = hostname.replace(/^www\./, '');
       store = store.charAt(0).toUpperCase() + store.slice(1);
+    } else if (isFnac) {
+      store = 'Fnac';
     }
 
     return {
       price: price || 'Non renseigné',
-      title: title,
+      title: title || 'Produit sans titre',
       image: image,
       store: store,
       src: src
@@ -421,7 +434,7 @@
   var data = extractProduct();
 
   if (typeof completion === 'function') {
-    // iPhone / Raccourcis : on renvoie l'URL complète à ouvrir
+    // iPhone / Raccourcis : on renvoie l'URL complète à ouvrir sous forme d'objet JSON
     completion(JSON.stringify({
       url: BASE + '?add_url=' + encodeURIComponent(location.href) +
            '&js_data=' + encodeURIComponent(JSON.stringify(data))
