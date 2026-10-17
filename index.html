@@ -499,7 +499,7 @@
         card.innerHTML = `
           <div>
             <div class="h-48 overflow-hidden bg-slate-100 relative">
-              <img src="${product.image_url}" alt="${product.title}" class="w-full h-full object-contain p-2">
+              <img src="${product.image_url}" alt="${product.title}" referrerpolicy="no-referrer" class="w-full h-full object-contain p-2">
               ${showBoughtStatus ? '<span class="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded font-bold">🎁 Déjà offert</span>' : ''}
               ${currentRole === 'admin' ? `<button type="button" onclick="deleteProduct(${product.id})" class="absolute top-2 right-2 bg-slate-800 bg-opacity-70 text-white p-1.5 rounded-full hover:bg-red-600 transition text-xs cursor-pointer">🗑️</button>` : ''}
             </div>
