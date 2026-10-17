@@ -99,18 +99,21 @@
   </main>
 
   <script>
-    // Variables injectées dynamiquement via GitHub Actions
+    // Secrets injectés directement par GitHub Actions
     const SUPABASE_URL = '__SUPABASE_URL__';
     const SUPABASE_KEY = '__SUPABASE_KEY__';
     const ACCESS_CODE_GUEST = '__GUEST_PASSWORD__';
     const ACCESS_CODE_ADMIN = '__ADMIN_PASSWORD__';
     const QUICK_ADD_TOKEN = '__QUICK_ADD_TOKEN__';
 
-    // Fallbacks de secours pour l'exécution locale
-    const ACTUAL_URL = (SUPABASE_URL && !SUPABASE_URL.startsWith('__')) ? SUPABASE_URL : 'https://glufuwoyxbyljnnthmbq.supabase.co';
-    const ACTUAL_KEY = (SUPABASE_KEY && !SUPABASE_KEY.startsWith('__')) ? SUPABASE_KEY : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdsdWZ1d295eGJ5bGpubnRobWJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3MTg4MjUsImV4cCI6MjE0NzI5NDgyNX0.Zi64NJ2qr07oZMCA8acwmD8f1fEP6NJN_DyO5IvrIUc';
-    const ACTUAL_GUEST_PASS = (ACCESS_CODE_GUEST && !ACCESS_CODE_GUEST.startsWith('__')) ? ACCESS_CODE_GUEST : '1234';
-    const ACTUAL_ADMIN_PASS = (ACCESS_CODE_ADMIN && !ACCESS_CODE_ADMIN.startsWith('__')) ? ACCESS_CODE_ADMIN : '5678';
+    // Vérification de présence des secrets
+    const IS_INJECTED = (val) => val && !val.startsWith('__');
+
+    const ACTUAL_URL = IS_INJECTED(SUPABASE_URL) ? SUPABASE_URL : null;
+    const ACTUAL_KEY = IS_INJECTED(SUPABASE_KEY) ? SUPABASE_KEY : null;
+    const ACTUAL_GUEST_PASS = IS_INJECTED(ACCESS_CODE_GUEST) ? ACCESS_CODE_GUEST : null;
+    const ACTUAL_ADMIN_PASS = IS_INJECTED(ACCESS_CODE_ADMIN) ? ACCESS_CODE_ADMIN : null;
+    const ACTUAL_QUICK_TOKEN = IS_INJECTED(QUICK_ADD_TOKEN) ? QUICK_ADD_TOKEN : null;
 
     let supabaseClient = null;
     let selectedRole = null;
@@ -121,8 +124,10 @@
 
     window.addEventListener('DOMContentLoaded', () => {
       try {
-        if (typeof window.supabase !== 'undefined') {
+        if (typeof window.supabase !== 'undefined' && ACTUAL_URL && ACTUAL_KEY) {
           supabaseClient = window.supabase.createClient(ACTUAL_URL, ACTUAL_KEY);
+        } else {
+          console.error("Supabase SDK absent ou clés d'environnement non injectées.");
         }
       } catch(e) {
         console.error("Erreur d'initialisation Supabase :", e);
@@ -132,8 +137,8 @@
       isQuickAdd = urlParams.get('quick_add') === 'true';
       const tokenParam = urlParams.get('token');
 
-      // Si le token transmis dans l'URL correspond au secret, déverrouillage automatique
-      if (isQuickAdd && tokenParam && QUICK_ADD_TOKEN && tokenParam === QUICK_ADD_TOKEN) {
+      // Déverrouillage automatique si token de raccourci valide
+      if (isQuickAdd && tokenParam && ACTUAL_QUICK_TOKEN && tokenParam === ACTUAL_QUICK_TOKEN) {
         currentRole = 'admin';
         localStorage.setItem('user_role', 'admin');
         unlockQuickAddMode();
@@ -193,7 +198,7 @@
       const input = document.getElementById('passInput').value.trim();
       const expectedCode = selectedRole === 'guest' ? ACTUAL_GUEST_PASS : ACTUAL_ADMIN_PASS;
 
-      if (input === expectedCode) {
+      if (expectedCode && input === expectedCode) {
         currentRole = selectedRole;
         localStorage.setItem('user_role', currentRole);
         if (isQuickAdd) unlockQuickAddMode();
@@ -347,6 +352,15 @@
       const select = document.getElementById('formListSelect');
       if (!select) return;
       select.innerHTML = '';
+
+      if (allLists.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.innerText = '-- Aucune liste disponible --';
+        select.appendChild(opt);
+        return;
+      }
+
       allLists.forEach(l => {
         const opt = document.createElement('option');
         opt.value = l.id;
