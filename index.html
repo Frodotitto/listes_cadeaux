@@ -107,13 +107,6 @@
     const ACCESS_CODE_GUEST = '__GUEST_PASSWORD__';
     const ACCESS_CODE_ADMIN = '__ADMIN_PASSWORD__';
 
-    // Valeurs de secours si les secrets ne sont pas encore injectés par GitHub Actions (ex: test local)
-    const ACTUAL_URL = (SUPABASE_URL && !SUPABASE_URL.startsWith('__')) ? SUPABASE_URL : 'https://glufuwoyxbyljnnthmbq.supabase.co';
-    const ACTUAL_KEY = (SUPABASE_KEY && !SUPABASE_KEY.startsWith('__')) ? SUPABASE_KEY : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdsdWZ1d295eGJ5bGpubnRobWJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3MTg4MjUsImV4cCI6MjE0NzI5NDgyNX0.Zi64NJ2qr07oZMCA8acwmD8f1fEP6NJN_DyO5IvrIUc';
-
-    const ACTUAL_GUEST_PASS = (ACCESS_CODE_GUEST && !ACCESS_CODE_GUEST.startsWith('__')) ? ACCESS_CODE_GUEST : '1234';
-    const ACTUAL_ADMIN_PASS = (ACCESS_CODE_ADMIN && !ACCESS_CODE_ADMIN.startsWith('__')) ? ACCESS_CODE_ADMIN : '5678';
-
     let supabaseClient = null;
     let selectedRole = null;
     let currentRole = null;
