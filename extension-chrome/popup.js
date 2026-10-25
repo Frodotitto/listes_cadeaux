@@ -1,6 +1,5 @@
-// Remplace par tes identifiants Supabase (ceux dans secrets GitHub / index.html)
-const SUPABASE_URL = "__SUPABASE_URL__";
-const SUPABASE_KEY = "__SUPABASE_KEY__";
+const SUPABASE_URL = "https://glufuwoyxbyljnnthmbq.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdsdWZ1d295eGJ5bGpubnRobWJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3MTg4MjUsImV4cCI6MjEwNzI5NDgyNX0.Zi64NJ2qr07oZMCA8acwmD8f1fEP6NJN_DyO5IvrIUc";
 
 document.addEventListener('DOMContentLoaded', async () => {
   // 1. Charger les listes depuis Supabase
