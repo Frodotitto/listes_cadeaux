@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mes Envies 🎁</title>
+  <title>Listes Cadeaux 🎁</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -13,14 +13,14 @@
   <div id="authModal" class="fixed inset-0 bg-slate-900 bg-opacity-80 flex items-center justify-center z-50 p-4">
     <div class="bg-white p-6 rounded-2xl shadow-2xl max-w-sm w-full text-center relative z-10">
       <div id="roleSelectionStep">
-        <h2 class="text-2xl font-extrabold mb-2 text-indigo-600">Mes Envies 🎁</h2>
+        <h2 class="text-2xl font-extrabold mb-2 text-indigo-600">Listes Cadeaux 🎁</h2>
         <p class="text-xs text-slate-500 mb-6">Comment souhaitez-vous vous connecter ?</p>
         <div class="flex flex-col gap-3">
           <button type="button" onclick="selectRole('guest')" class="w-full bg-indigo-50 border-2 border-indigo-200 hover:bg-indigo-100 text-indigo-700 py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 cursor-pointer">
-            <span>👥 Visiteur / Proche</span>
+            <span>👥 Famille</span>
           </button>
           <button type="button" onclick="selectRole('admin')" class="w-full bg-slate-100 border-2 border-slate-200 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 cursor-pointer">
-            <span>✏️ Créateur de la liste</span>
+            <span>✏️ Administrateur</span>
           </button>
         </div>
       </div>
@@ -54,8 +54,8 @@
         <label class="flex items-center gap-3 cursor-pointer">
           <input type="checkbox" id="listHideStatusInput" class="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500">
           <div>
-            <span class="block text-xs font-bold text-slate-700">Masquer le statut d'achat au créateur</span>
-            <span class="block text-[10px] text-slate-500">Garde la surprise pour vous. Les visiteurs verront toujours les réservations pour éviter les doublons.</span>
+            <span class="block text-xs font-bold text-slate-700">Masquer le statut d'achat à l'administrateur</span>
+            <span class="block text-[10px] text-slate-500">Garde la surprise pour vous. La Famille verra toujours les réservations pour éviter les doublons.</span>
           </div>
         </label>
       </div>
@@ -120,7 +120,7 @@
   <main id="appContent" class="max-w-4xl mx-auto opacity-10 pointer-events-none transition-opacity duration-300">
     <header class="flex justify-between items-center mb-6 border-b pb-4" id="mainHeader">
       <div>
-        <h1 class="text-3xl font-extrabold text-indigo-600">Mes Envies 🎁</h1>
+        <h1 class="text-3xl font-extrabold text-indigo-600">Listes Cadeaux 🎁</h1>
         <p class="text-slate-500 text-sm" id="roleBadge">Chargement...</p>
       </div>
       <button type="button" onclick="logout()" class="text-xs bg-slate-200 px-3 py-1.5 rounded-full hover:bg-slate-300 font-medium text-slate-700">🚪 Déconnexion</button>
@@ -197,11 +197,11 @@
       document.getElementById('authError')?.classList.add('hidden');
 
       if (role === 'guest') {
-        document.getElementById('passwordTitle').innerText = "Accès Visiteur";
-        document.getElementById('passwordSubtitle').innerText = "Entrez le mot de passe reçu pour consulter la liste.";
+        document.getElementById('passwordTitle').innerText = "Accès Famille";
+        document.getElementById('passwordSubtitle').innerText = "Entrez le mot de passe reçu pour consulter les listes.";
       } else {
-        document.getElementById('passwordTitle').innerText = "Accès Créateur";
-        document.getElementById('passwordSubtitle').innerText = "Entrez votre mot de passe créateur pour gérer les articles.";
+        document.getElementById('passwordTitle').innerText = "Accès Administrateur";
+        document.getElementById('passwordSubtitle').innerText = "Entrez votre mot de passe administrateur pour gérer les articles.";
       }
       setTimeout(() => document.getElementById('passInput')?.focus(), 100);
     }
@@ -249,13 +249,13 @@
       const roleBadge = document.getElementById('roleBadge');
       if (currentRole === 'admin') {
         if (roleBadge) {
-          roleBadge.innerText = "Mode Créateur";
+          roleBadge.innerText = "Mode Administrateur";
           roleBadge.className = "text-indigo-600 text-sm font-bold";
         }
         document.getElementById('adminSection')?.classList.remove('hidden');
       } else {
         if (roleBadge) {
-          roleBadge.innerText = "Espace Visiteur / Proches";
+          roleBadge.innerText = "Espace Famille";
           roleBadge.className = "text-slate-500 text-sm";
         }
         document.getElementById('adminSection')?.classList.add('hidden');
@@ -405,7 +405,7 @@
       document.getElementById('listModalTitle').innerText = "🎁 Nouvelle Liste";
       document.getElementById('editListId').value = "";
       document.getElementById('listNameInput').value = "";
-      document.getElementById('listHideStatusInput').checked = true; // Masqué au créateur par défaut
+      document.getElementById('listHideStatusInput').checked = true;
       document.getElementById('listModal').classList.remove('hidden');
     }
 
@@ -527,7 +527,7 @@
     }
 
     async function saveProduct() {
-      if (currentRole !== 'admin') return alert("Action réservée au créateur.");
+      if (currentRole !== 'admin') return alert("Action réservée à l'administrateur.");
       if (!supabaseClient) return alert("Base de données non connectée.");
 
       const title = document.getElementById('productTitle').value;
@@ -600,10 +600,10 @@
         currentProductsMap[product.id] = product;
         const isGuest = currentRole === 'guest';
         
-        // Côté Visiteur : l'état d'achat est TOUJOURS visible
+        // Côté Famille : l'état d'achat est TOUJOURS visible
         const showBoughtToGuest = isGuest && product.is_bought;
         
-        // Côté Admin : l'état est visible SEULEMENT si l'option hide_status est décochée (false)
+        // Côté Administrateur : l'état est visible SEULEMENT si l'option hide_status est décochée (false)
         const showBoughtToAdmin = !isGuest && !isListHiddenFromAdmin && product.is_bought;
 
         const card = document.createElement('div');
@@ -615,7 +615,7 @@
                    referrerpolicy="no-referrer"
                    onerror="this.onerror=null; this.src='https://images.weserv.nl/?url=' + encodeURIComponent('${product.image_url}');"
                    class="w-full h-full object-contain p-2">
-              ${showBoughtToGuest ? `<span class="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded font-bold">🎁 Déjà offert (${product.bought_by || 'par un proche'})</span>` : ''}
+              ${showBoughtToGuest ? `<span class="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded font-bold">🎁 Déjà offert (${product.bought_by || 'par un membre de la famille'})</span>` : ''}
               ${showBoughtToAdmin ? `<span class="absolute top-2 left-2 bg-emerald-600 text-white text-xs px-2 py-1 rounded font-bold">✓ Réservé (${product.bought_by})</span>` : ''}
               ${currentRole === 'admin' ? `
                 <div class="absolute top-2 right-2 flex gap-1">
@@ -711,7 +711,7 @@
     }
 
     async function markAsBought(id) {
-      if (currentRole === 'admin') return alert("Le créateur ne peut pas réserver les articles de sa propre liste !");
+      if (currentRole === 'admin') return alert("L'administrateur ne peut pas réserver les articles de sa propre liste !");
       if (!supabaseClient) return;
       const name = prompt("Votre prénom pour réserver ce cadeau :");
       if (!name) return;
