@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 1. Charger les listes depuis Supabase
   loadLists();
 
-  // 2. Extraire les métadonnées du produit
+  // 2. Extraire les métadonnées du produit depuis l'onglet actif
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   
   if (tab && tab.id) {
@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const price = document.getElementById('price').value.trim();
     const store = document.getElementById('store').value.trim();
     const image = document.getElementById('image').value.trim();
-    const url = document.getElementById('productUrl') ? document.getElementById('productUrl').value.trim() : document.getElementById('url').value.trim();
+    const url = document.getElementById('url').value.trim();
     const comment = document.getElementById('comment').value.trim();
     const list_id = document.getElementById('listSelect').value;
 
@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const BASE_URL = "https://frodotitto.github.io/listes_cadeaux/";
     
-    // On passe par add_url et js_data SANS quick_add=true pour charger le site normal
+    // Transmission des données vers le site sans déclencher le mode iOS
     const targetUrl = `${BASE_URL}?add_url=${encodeURIComponent(url)}&js_data=${encodeURIComponent(JSON.stringify(payload))}`;
 
     chrome.tabs.create({ url: targetUrl });
@@ -56,7 +56,6 @@ async function loadLists() {
   if (!select) return;
 
   try {
-    // S'assurer que l'URL ne termine pas par un slash
     const cleanUrl = SUPABASE_URL.replace(/\/$/, '');
     
     const response = await fetch(`${cleanUrl}/rest/v1/lists?select=id,name&order=id.asc`, {
