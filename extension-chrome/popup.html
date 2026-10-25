@@ -3,29 +3,59 @@
 <head>
   <meta charset="UTF-8">
   <style>
-    body { font-family: system-ui, sans-serif; width: 300px; padding: 12px; margin: 0; background: #f8fafc; }
-    h3 { margin: 0 0 10px; font-size: 14px; color: #4f46e5; text-align: center; }
-    .form-group { margin-bottom: 8px; }
-    label { display: block; font-size: 10px; font-weight: bold; color: #64748b; margin-bottom: 2px; }
-    input, select { width: 100%; box-sizing: border-box; padding: 6px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; background: white; }
-    button { width: 100%; padding: 8px; background: #059669; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 6px; }
+    body { font-family: system-ui, -apple-system, sans-serif; width: 320px; padding: 12px; margin: 0; background-color: #f8fafc; }
+    h2 { font-size: 16px; margin: 0 0 12px 0; color: #4f46e5; }
+    .field { margin-bottom: 10px; }
+    label { display: block; font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 3px; }
+    input, select, textarea { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #cbd5e1; rounded: 8px; border-radius: 6px; font-size: 13px; outline: none; }
+    input:focus, select:focus, textarea:focus { border-color: #6366f1; }
+    textarea { resize: vertical; min-height: 50px; font-family: inherit; }
+    button { width: 100%; background: #059669; color: white; border: none; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 5px; }
     button:hover { background: #047857; }
-    #status { font-size: 11px; text-align: center; margin-top: 6px; color: #4f46e5; }
+    #status { font-size: 11px; color: #6366f1; text-align: center; margin-top: 8px; min-height: 16px; }
   </style>
 </head>
 <body>
-  <h3>Ajouter à MesEnvies 🎁</h3>
-  <div class="form-group">
-    <label>Liste :</label>
-    <select id="listSelect"><option value="">Chargement...</option></select>
+  <h2>🎁 Ajouter à Listes Cadeaux</h2>
+
+  <div class="field">
+    <label for="listSelect">Liste destination :</label>
+    <select id="listSelect"></select>
   </div>
-  <div class="form-group"><label>Titre :</label><input type="text" id="title"></div>
-  <div class="form-group"><label>Prix :</label><input type="text" id="price"></div>
-  <div class="form-group"><label>Marchand :</label><input type="text" id="store"></div>
-  <div class="form-group"><label>Image URL :</label><input type="text" id="image"></div>
-  <input type="hidden" id="url">
-  <button id="saveBtn">💾 Enregistrer l'article</button>
-  <p id="status">Extraction des infos...</p>
+
+  <div class="field">
+    <label for="title">Titre :</label>
+    <input type="text" id="title">
+  </div>
+
+  <div class="field">
+    <label for="price">Prix :</label>
+    <input type="text" id="price">
+  </div>
+
+  <div class="field">
+    <label for="store">Marchand :</label>
+    <input type="text" id="store">
+  </div>
+
+  <div class="field">
+    <label for="url">URL produit :</label>
+    <input type="url" id="url">
+  </div>
+
+  <div class="field">
+    <label for="image">URL de l'image :</label>
+    <input type="url" id="image">
+  </div>
+
+  <div class="field">
+    <label for="comment">Commentaire / Remarques :</label>
+    <textarea id="comment" placeholder="Taille, couleur, précisions..."></textarea>
+  </div>
+
+  <button id="addBtn">💾 Enregistrer dans la liste</button>
+  <div id="status"></div>
+
   <script src="popup.js"></script>
 </body>
 </html>
