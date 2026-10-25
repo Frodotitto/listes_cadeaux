@@ -15,15 +15,15 @@
       
       <!-- Étape 1 : Choix du Mode -->
       <div id="roleSelectionStep">
-        <h2 class="text-2xl font-extrabold mb-2 text-indigo-600">Mes Envies 🎁</h2>
-        <p class="text-xs text-slate-500 mb-6">Comment souhaitez-vous vous connecter ?</p>
+        <h2 class="text-2xl font-extrabold mb-2 text-indigo-600">Listes Cadeaux 🎁</h2>
+        <p class="text-xs text-slate-500 mb-6">Connexion</p>
         
         <div class="flex flex-col gap-3">
           <button type="button" onclick="selectRole('guest')" class="w-full bg-indigo-50 border-2 border-indigo-200 hover:bg-indigo-100 text-indigo-700 py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 cursor-pointer">
-            <span>👥 Visiteur / Proche</span>
+            <span>👥 Famille</span>
           </button>
           <button type="button" onclick="selectRole('admin')" class="w-full bg-slate-100 border-2 border-slate-200 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 cursor-pointer">
-            <span>✏️ Créateur de la liste</span>
+            <span>✏️ Administrateur</span>
           </button>
         </div>
       </div>
@@ -104,7 +104,7 @@
   <main id="appContent" class="max-w-4xl mx-auto opacity-10 pointer-events-none transition-opacity duration-300">
     <header class="flex justify-between items-center mb-6 border-b pb-4" id="mainHeader">
       <div>
-        <h1 class="text-3xl font-extrabold text-indigo-600">Mes Envies 🎁</h1>
+        <h1 class="text-3xl font-extrabold text-indigo-600">Listes Cadeaux 🎁</h1>
         <p class="text-slate-500 text-sm" id="roleBadge">Chargement...</p>
       </div>
       <button type="button" onclick="logout()" class="text-xs bg-slate-200 px-3 py-1.5 rounded-full hover:bg-slate-300 font-medium text-slate-700">
@@ -381,7 +381,16 @@
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = `px-4 py-2 rounded-full text-xs font-bold transition flex items-center gap-2 ${isSelected ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 border hover:bg-slate-100'}`;
-        btn.innerHTML = `<span>🎁 ${list.name}</span>${currentRole === 'admin' ? `<span onclick="deleteList(event, ${list.id})" class="hover:text-red-300">✕</span>` : ''}`;
+        
+        let actionsHtml = '';
+        if (currentRole === 'admin') {
+          actionsHtml = `
+            <span onclick="renameList(event, ${list.id}, '${list.name.replace(/'/g, "\\'")}')" title="Renommer la liste" class="hover:text-amber-300 ml-1">✏️</span>
+            <span onclick="deleteList(event, ${list.id})" title="Supprimer la liste" class="hover:text-red-300">✕</span>
+          `;
+        }
+
+        btn.innerHTML = `<span>🎁 ${list.name}</span>${actionsHtml}`;
         btn.onclick = () => selectList(list.id);
         container.appendChild(btn);
       });
@@ -405,11 +414,29 @@
     async function createNewList() {
       if (!supabaseClient) return alert("Base de données non initialisée.");
       const name = prompt("Nom de la liste (ex: Naissance, Crémaillère) :");
-      if (!name) return;
-      const { data, error } = await supabaseClient.from('lists').insert([{ name }]).select();
+      if (!name || !name.trim()) return;
+      const { data, error } = await supabaseClient.from('lists').insert([{ name: name.trim() }]).select();
       if (error) return alert("Erreur création liste : " + error.message);
       await loadLists();
       if (data && data[0]) selectList(data[0].id);
+    }
+
+    async function renameList(e, id, currentName) {
+      if (!supabaseClient) return;
+      e.stopPropagation();
+      const newName = prompt("Nouveau nom de la liste :", currentName);
+      if (!newName || !newName.trim() || newName.trim() === currentName) return;
+
+      const { error } = await supabaseClient
+        .from('lists')
+        .update({ name: newName.trim() })
+        .eq('id', id);
+
+      if (error) {
+        alert("Erreur lors du changement de nom : " + error.message);
+      } else {
+        await loadLists();
+      }
     }
 
     async function deleteList(e, id) {
