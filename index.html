@@ -384,51 +384,90 @@
       }
     }
 
+    let draggedListId = null;
+
     async function loadLists() {
       if (!supabaseClient) return;
-      const { data: lists, error } = await supabaseClient.from('lists').select('*').order('id', { ascending: true });
+      // On trie désormais par la colonne 'position'
+      const { data: lists, error } = await supabaseClient
+        .from('lists')
+        .select('*')
+        .order('position', { ascending: true });
+    
       if (error) return;
       allLists = lists || [];
-
+    
       const savedListId = parseInt(localStorage.getItem('active_list_id'));
       const listExists = allLists.some(l => l.id === savedListId);
-
+    
       if (savedListId && listExists) {
         currentListId = savedListId;
       } else if (allLists.length > 0) {
         currentListId = allLists[0].id;
         localStorage.setItem('active_list_id', currentListId);
       }
-
+    
       renderTabs();
       updateListDropdown();
       if (!isQuickAdd && currentListId) loadProducts();
     }
-
+    
     function renderTabs() {
       const container = document.getElementById('tabsContainer');
       if (!container) return;
       container.innerHTML = '';
-
-      allLists.forEach(list => {
+    
+      allLists.forEach((list, index) => {
         const isSelected = list.id === currentListId;
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = `px-4 py-2 rounded-full text-xs font-bold transition flex items-center gap-2 ${isSelected ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 border hover:bg-slate-100'}`;
-        
+        btn.className = `px-4 py-2 rounded-full text-xs font-bold transition flex items-center gap-2 cursor-grab active:cursor-grabbing ${
+          isSelected ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 border hover:bg-slate-100'
+        }`;
+    
+        // Configuration du Drag & Drop (uniquement pour l'Admin)
+        if (currentRole === 'admin') {
+          btn.draggable = true;
+          btn.dataset.id = list.id;
+          btn.dataset.index = index;
+    
+          btn.addEventListener('dragstart', (e) => {
+            draggedListId = list.id;
+            e.dataTransfer.effectAllowed = 'move';
+            btn.classList.add('opacity-50');
+          });
+    
+          btn.addEventListener('dragend', () => {
+            btn.classList.remove('opacity-50');
+          });
+    
+          btn.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+          });
+    
+          btn.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            const targetId = parseInt(btn.dataset.id);
+            if (draggedListId && draggedListId !== targetId) {
+              await reorderLists(draggedListId, targetId);
+            }
+          });
+        }
+    
         let actionsHtml = '';
         if (currentRole === 'admin') {
           actionsHtml = `
-            <span onclick="openEditListModal(event, ${list.id})" title="Paramètres de la liste" class="hover:text-amber-300 ml-1">✏️</span>
-            <span onclick="deleteList(event, ${list.id})" title="Supprimer la liste" class="hover:text-red-300">✕</span>
+            <span onclick="openEditListModal(event, ${list.id})" title="Paramètres de la liste" class="hover:text-amber-300 ml-1 cursor-pointer">✏️</span>
+            <span onclick="deleteList(event, ${list.id})" title="Supprimer la liste" class="hover:text-red-300 cursor-pointer">✕</span>
           `;
         }
-
+    
         btn.innerHTML = `<span>🎁 ${list.name}${currentRole === 'admin' && list.hide_status ? ' 🔒' : ''}</span>${actionsHtml}`;
         btn.onclick = () => selectList(list.id);
         container.appendChild(btn);
       });
-
+    
       if (currentRole === 'admin') {
         const addBtn = document.createElement('button');
         addBtn.type = 'button';
@@ -437,6 +476,30 @@
         addBtn.onclick = () => openCreateListModal();
         container.appendChild(addBtn);
       }
+    }
+    
+    async function reorderLists(draggedId, targetId) {
+      const draggedIndex = allLists.findIndex(l => l.id === draggedId);
+      const targetIndex = allLists.findIndex(l => l.id === targetId);
+    
+      if (draggedIndex === -1 || targetIndex === -1) return;
+    
+      // Réordonnancement du tableau local
+      const [movedList] = allLists.splice(draggedIndex, 1);
+      allLists.splice(targetIndex, 0, movedList);
+    
+      // Mise à jour de l'affichage immédiatement
+      renderTabs();
+    
+      // Mise à jour en base de données de chaque liste
+      const updates = allLists.map((list, idx) => {
+        return supabaseClient
+          .from('lists')
+          .update({ position: idx })
+          .eq('id', list.id);
+      });
+    
+      await Promise.all(updates);
     }
 
     function selectList(id) { 
