@@ -14,7 +14,7 @@
     <div class="bg-white p-6 rounded-2xl shadow-2xl max-w-sm w-full text-center relative z-10">
       <div id="roleSelectionStep">
         <h2 class="text-2xl font-extrabold mb-2 text-indigo-600">Listes Cadeaux 🎁</h2>
-        <p class="text-xs text-slate-500 mb-6">Connexion</p>
+        <p class="text-xs text-slate-500 mb-6">Comment souhaitez-vous vous connecter ?</p>
         <div class="flex flex-col gap-3">
           <button type="button" onclick="selectRole('guest')" class="w-full bg-indigo-50 border-2 border-indigo-200 hover:bg-indigo-100 text-indigo-700 py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 cursor-pointer">
             <span>👥 Famille</span>
@@ -30,7 +30,6 @@
         <h3 id="passwordTitle" class="text-lg font-bold mb-2 text-slate-800">Accès Restreint</h3>
         <p id="passwordSubtitle" class="text-xs text-slate-500 mb-4"></p>
         
-        <!-- Boîte de saisie du mot de passe avec bouton œil -->
         <div class="relative mb-4">
           <input type="password" id="passInput" class="w-full p-2.5 pr-10 border rounded-xl text-center text-lg font-bold tracking-widest focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="••••" onkeydown="if(event.key === 'Enter') validatePassword()">
           <button type="button" onclick="togglePasswordVisibility()" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer" title="Afficher/Masquer le mot de passe">
@@ -196,6 +195,7 @@
     let allLists = [];
     let currentProductsMap = {};
     let isQuickAdd = false;
+    let draggedListId = null;
 
     function selectRole(role) {
       selectedRole = role;
@@ -323,7 +323,6 @@
     async function initApp() {
       await loadLists();
     
-      // Écouteur pour enregistrer immédiatement le changement de liste dans le formulaire web / iOS
       const formSelect = document.getElementById('formListSelect');
       if (formSelect) {
         formSelect.addEventListener('change', (e) => {
@@ -356,7 +355,6 @@
             if (parsed.store) document.getElementById('productStore').value = parsed.store;
             if (parsed.comment) document.getElementById('productComment').value = parsed.comment;
     
-            // Si une liste spécifique est transmise dans le payload, on la sélectionne et on la mémorise
             if (parsed.list_id) {
               currentListId = parseInt(parsed.list_id);
               localStorage.setItem('active_list_id', currentListId);
@@ -365,7 +363,6 @@
           } catch(e) {}
         }
     
-        // Pré-sélectionne la liste mémorisée dans le menu déroulant
         if (formSelect && currentListId) {
           formSelect.value = currentListId;
         }
@@ -375,7 +372,7 @@
             document.getElementById('productStore').value = new URL(decodedUrl).hostname.replace('www.', '');
           }
         } catch(e) {}
-    
+
         if (document.getElementById('productTitle').value || document.getElementById('productPrice').value) {
           document.getElementById('fetchStatus').innerText = "✅ Informations extraites de la page !";
         } else {
@@ -384,68 +381,70 @@
       }
     }
 
-    let draggedListId = null;
-
     async function loadLists() {
       if (!supabaseClient) return;
-      // On trie désormais par la colonne 'position'
+      
       const { data: lists, error } = await supabaseClient
         .from('lists')
         .select('*')
         .order('position', { ascending: true });
-    
-      if (error) return;
-      allLists = lists || [];
-    
+
+      if (error) {
+        // En cas d'absence de la colonne position, fallback sur id
+        const { data: fallbackLists } = await supabaseClient.from('lists').select('*').order('id', { ascending: true });
+        allLists = fallbackLists || [];
+      } else {
+        allLists = lists || [];
+      }
+
       const savedListId = parseInt(localStorage.getItem('active_list_id'));
       const listExists = allLists.some(l => l.id === savedListId);
-    
+
       if (savedListId && listExists) {
         currentListId = savedListId;
       } else if (allLists.length > 0) {
         currentListId = allLists[0].id;
         localStorage.setItem('active_list_id', currentListId);
       }
-    
+
       renderTabs();
       updateListDropdown();
       if (!isQuickAdd && currentListId) loadProducts();
     }
-    
+
     function renderTabs() {
       const container = document.getElementById('tabsContainer');
       if (!container) return;
       container.innerHTML = '';
-    
+
       allLists.forEach((list, index) => {
         const isSelected = list.id === currentListId;
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = `px-4 py-2 rounded-full text-xs font-bold transition flex items-center gap-2 cursor-grab active:cursor-grabbing ${
-          isSelected ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 border hover:bg-slate-100'
-        }`;
-    
-        // Configuration du Drag & Drop (uniquement pour l'Admin)
+        btn.className = `px-4 py-2 rounded-full text-xs font-bold transition flex items-center gap-2 ${
+          currentRole === 'admin' ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
+        } ${isSelected ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 border hover:bg-slate-100'}`;
+
         if (currentRole === 'admin') {
           btn.draggable = true;
           btn.dataset.id = list.id;
           btn.dataset.index = index;
-    
+
           btn.addEventListener('dragstart', (e) => {
             draggedListId = list.id;
             e.dataTransfer.effectAllowed = 'move';
             btn.classList.add('opacity-50');
           });
-    
+
           btn.addEventListener('dragend', () => {
             btn.classList.remove('opacity-50');
           });
-    
+
           btn.addEventListener('dragover', (e) => {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
           });
-    
+
           btn.addEventListener('drop', async (e) => {
             e.preventDefault();
             const targetId = parseInt(btn.dataset.id);
@@ -454,7 +453,7 @@
             }
           });
         }
-    
+
         let actionsHtml = '';
         if (currentRole === 'admin') {
           actionsHtml = `
@@ -462,12 +461,12 @@
             <span onclick="deleteList(event, ${list.id})" title="Supprimer la liste" class="hover:text-red-300 cursor-pointer">✕</span>
           `;
         }
-    
+
         btn.innerHTML = `<span>🎁 ${list.name}${currentRole === 'admin' && list.hide_status ? ' 🔒' : ''}</span>${actionsHtml}`;
         btn.onclick = () => selectList(list.id);
         container.appendChild(btn);
       });
-    
+
       if (currentRole === 'admin') {
         const addBtn = document.createElement('button');
         addBtn.type = 'button';
@@ -477,28 +476,25 @@
         container.appendChild(addBtn);
       }
     }
-    
+
     async function reorderLists(draggedId, targetId) {
       const draggedIndex = allLists.findIndex(l => l.id === draggedId);
       const targetIndex = allLists.findIndex(l => l.id === targetId);
-    
+
       if (draggedIndex === -1 || targetIndex === -1) return;
-    
-      // Réordonnancement du tableau local
+
       const [movedList] = allLists.splice(draggedIndex, 1);
       allLists.splice(targetIndex, 0, movedList);
-    
-      // Mise à jour de l'affichage immédiatement
+
       renderTabs();
-    
-      // Mise à jour en base de données de chaque liste
+
       const updates = allLists.map((list, idx) => {
         return supabaseClient
           .from('lists')
           .update({ position: idx })
           .eq('id', list.id);
       });
-    
+
       await Promise.all(updates);
     }
 
@@ -550,9 +546,10 @@
 
         if (error) return alert("Erreur lors de la mise à jour : " + error.message);
       } else {
+        const newPos = allLists.length;
         const { data, error } = await supabaseClient
           .from('lists')
-          .insert([{ name, hide_status }])
+          .insert([{ name, hide_status, position: newPos }])
           .select();
 
         if (error) return alert("Erreur création liste : " + error.message);
