@@ -14,7 +14,7 @@
     <div class="bg-white p-6 rounded-2xl shadow-2xl max-w-sm w-full text-center relative z-10">
       <div id="roleSelectionStep">
         <h2 class="text-2xl font-extrabold mb-2 text-indigo-600">Listes Cadeaux 🎁</h2>
-        <p class="text-xs text-slate-500 mb-6">Comment souhaitez-vous vous connecter ?</p>
+        <p class="text-xs text-slate-500 mb-6">Connexion</p>
         <div class="flex flex-col gap-3">
           <button type="button" onclick="selectRole('guest')" class="w-full bg-indigo-50 border-2 border-indigo-200 hover:bg-indigo-100 text-indigo-700 py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 cursor-pointer">
             <span>👥 Famille</span>
@@ -197,7 +197,6 @@
     let isQuickAdd = false;
     let draggedListId = null;
 
-    // Generer le hash SHA-256 d'une chaîne
     async function hashString(str) {
       if (!str) return "";
       const encoder = new TextEncoder();
@@ -729,7 +728,7 @@
                    referrerpolicy="no-referrer"
                    onerror="this.onerror=null; this.src='https://images.weserv.nl/?url=' + encodeURIComponent('${product.image_url}');"
                    class="w-full h-full object-contain p-2">
-              ${showBoughtToGuest ? `<span class="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded font-bold">🎁 Déjà offert (${product.bought_by || 'par un membre de la famille'})</span>` : ''}
+              ${showBoughtToGuest ? `<span class="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded font-bold">🎁 Déjà réservé</span>` : ''}
               ${showBoughtToAdmin ? `<span class="absolute top-2 left-2 bg-emerald-600 text-white text-xs px-2 py-1 rounded font-bold">✓ Réservé (${product.bought_by})</span>` : ''}
               ${currentRole === 'admin' ? `
                 <div class="absolute top-2 right-2 flex gap-1">
@@ -754,8 +753,9 @@
                   🔒 Statut d'achat masqué pour garder la surprise !
                 </div>
               ` : product.is_bought ? `
-                <div class="text-center text-xs text-emerald-700 bg-emerald-50 font-bold py-2 rounded-lg border border-emerald-200">
-                  ✓ Réservé par ${product.bought_by || 'un proche'}
+                <div class="text-center text-xs text-emerald-700 bg-emerald-50 font-bold py-2 rounded-lg border border-emerald-200 flex flex-col gap-1">
+                  <span>✓ Réservé par ${product.bought_by || 'un proche'}</span>
+                  <button type="button" onclick="cancelBought(${product.id}, true)" class="text-[10px] text-red-500 hover:underline font-normal cursor-pointer">Annuler la réservation</button>
                 </div>
               ` : `
                 <div class="text-center text-xs text-slate-500 bg-slate-100 py-2 rounded-lg border">
@@ -763,8 +763,13 @@
                 </div>
               `
             ) : product.is_bought ? `
-              <div class="text-center text-xs text-red-600 bg-red-50 font-bold py-2 rounded-lg border border-red-100">
-                🎁 Déjà réservé par ${product.bought_by || 'un proche'}
+              <div class="flex flex-col gap-1">
+                <div class="text-center text-xs text-red-600 bg-red-50 font-bold py-2 rounded-lg border border-red-100">
+                  🎁 Déjà réservé
+                </div>
+                <button type="button" onclick="cancelBought(${product.id})" class="text-[11px] text-slate-400 hover:text-red-500 underline text-center cursor-pointer">
+                  C'est une erreur ? Annuler la réservation
+                </button>
               </div>
             ` : `
               <button type="button" onclick="markAsBought(${product.id})" class="w-full bg-emerald-600 text-white text-xs font-bold py-2 rounded hover:bg-emerald-700 transition cursor-pointer">Offrir cet article</button>
@@ -829,8 +834,37 @@
       if (!supabaseClient) return;
       const name = prompt("Votre prénom pour réserver ce cadeau :");
       if (!name) return;
-      await supabaseClient.from('products').update({ is_bought: true, bought_by: name }).eq('id', id);
+      await supabaseClient.from('products').update({ is_bought: true, bought_by: name.trim() }).eq('id', id);
       loadProducts();
+    }
+
+    async function cancelBought(id, isAdminForce = false) {
+      if (!supabaseClient) return;
+
+      const product = currentProductsMap[id];
+      if (!product || !product.is_bought) return;
+
+      if (!isAdminForce) {
+        const inputName = prompt("Entrez le prénom utilisé lors de la réservation pour l'annuler :");
+        if (!inputName) return;
+
+        if (inputName.trim().toLowerCase() !== (product.bought_by || '').trim().toLowerCase()) {
+          return alert("⚠️ Le prénom ne correspond pas à celui utilisé lors de la réservation.");
+        }
+      } else {
+        if (!confirm(`Annuler la réservation de ${product.bought_by || 'cet acheteur'} ?`)) return;
+      }
+
+      const { error } = await supabaseClient
+        .from('products')
+        .update({ is_bought: false, bought_by: null })
+        .eq('id', id);
+
+      if (error) {
+        alert("Erreur lors de l'annulation : " + error.message);
+      } else {
+        loadProducts();
+      }
     }
 
     async function deleteProduct(id) {
