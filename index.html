@@ -217,10 +217,10 @@
 
       if (role === 'guest') {
         document.getElementById('passwordTitle').innerText = "Accès Famille";
-        document.getElementById('passwordSubtitle').innerText = "Entrez le mot de passe reçu pour consulter les listes.";
+        document.getElementById('passwordSubtitle').innerText = "Entrer le mot de passe reçu pour consulter les listes.";
       } else {
         document.getElementById('passwordTitle').innerText = "Accès Administrateur";
-        document.getElementById('passwordSubtitle').innerText = "Entrez votre mot de passe administrateur pour gérer les articles.";
+        document.getElementById('passwordSubtitle').innerText = "Entrer le mot de passe administrateur pour gérer les articles.";
       }
       setTimeout(() => document.getElementById('passInput')?.focus(), 100);
     }
@@ -845,7 +845,7 @@
       if (!product || !product.is_bought) return;
 
       if (!isAdminForce) {
-        const inputName = prompt("Entrez le prénom utilisé lors de la réservation pour l'annuler :");
+        const inputName = prompt("Entrer le prénom utilisé lors de la réservation pour l'annuler :");
         if (!inputName) return;
 
         if (inputName.trim().toLowerCase() !== (product.bought_by || '').trim().toLowerCase()) {
