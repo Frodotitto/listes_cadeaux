@@ -1,9 +1,14 @@
 {
   "manifest_version": 3,
-  "name": "Ajouter à MesEnvies 🎁",
+  "name": "Ajouter à Listes Cadeaux",
   "version": "1.0",
-  "description": "Ajoute en un clic l'article en cours de visionnage à ta liste de cadeaux.",
-  "permissions": ["activeTab", "scripting"],
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://*.supabase.co/*"
+  ],
   "action": {
     "default_popup": "popup.html"
   }
