@@ -15,15 +15,15 @@
       
       <!-- Étape 1 : Choix du Mode -->
       <div id="roleSelectionStep">
-        <h2 class="text-2xl font-extrabold mb-2 text-indigo-600">Listes Cadeaux 🎁</h2>
-        <p class="text-xs text-slate-500 mb-6">Connexion</p>
+        <h2 class="text-2xl font-extrabold mb-2 text-indigo-600">Mes Envies 🎁</h2>
+        <p class="text-xs text-slate-500 mb-6">Comment souhaitez-vous vous connecter ?</p>
         
         <div class="flex flex-col gap-3">
           <button type="button" onclick="selectRole('guest')" class="w-full bg-indigo-50 border-2 border-indigo-200 hover:bg-indigo-100 text-indigo-700 py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 cursor-pointer">
-            <span>👥 Famille</span>
+            <span>👥 Visiteur / Proche</span>
           </button>
           <button type="button" onclick="selectRole('admin')" class="w-full bg-slate-100 border-2 border-slate-200 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 cursor-pointer">
-            <span>✏️ Administrateur</span>
+            <span>✏️ Créateur de la liste</span>
           </button>
         </div>
       </div>
@@ -104,7 +104,7 @@
   <main id="appContent" class="max-w-4xl mx-auto opacity-10 pointer-events-none transition-opacity duration-300">
     <header class="flex justify-between items-center mb-6 border-b pb-4" id="mainHeader">
       <div>
-        <h1 class="text-3xl font-extrabold text-indigo-600">Listes Cadeaux 🎁</h1>
+        <h1 class="text-3xl font-extrabold text-indigo-600">Mes Envies 🎁</h1>
         <p class="text-slate-500 text-sm" id="roleBadge">Chargement...</p>
       </div>
       <button type="button" onclick="logout()" class="text-xs bg-slate-200 px-3 py-1.5 rounded-full hover:bg-slate-300 font-medium text-slate-700">
@@ -233,6 +233,7 @@
 
     function logout() {
       localStorage.removeItem('user_role');
+      localStorage.removeItem('active_list_id');
       window.location.href = window.location.pathname;
     }
 
@@ -364,9 +365,18 @@
         return;
       }
       allLists = lists || [];
-      if (allLists.length > 0 && !currentListId) {
+
+      // Restauration de la liste précédemment active ou choix de la 1ère par défaut
+      const savedListId = parseInt(localStorage.getItem('active_list_id'));
+      const listExists = allLists.some(l => l.id === savedListId);
+
+      if (savedListId && listExists) {
+        currentListId = savedListId;
+      } else if (allLists.length > 0) {
         currentListId = allLists[0].id;
+        localStorage.setItem('active_list_id', currentListId);
       }
+
       renderTabs();
       updateListDropdown();
       if (!isQuickAdd && currentListId) loadProducts();
@@ -407,7 +417,9 @@
 
     function selectList(id) { 
       currentListId = id; 
+      localStorage.setItem('active_list_id', id);
       renderTabs(); 
+      updateListDropdown();
       if (!isQuickAdd) loadProducts(); 
     }
 
@@ -444,7 +456,10 @@
       e.stopPropagation();
       if (!confirm("Supprimer cette liste et ses articles ?")) return;
       await supabaseClient.from('lists').delete().eq('id', id);
-      currentListId = null;
+      if (currentListId === id) {
+        localStorage.removeItem('active_list_id');
+        currentListId = null;
+      }
       await loadLists();
     }
 
@@ -675,7 +690,11 @@
         alert("Erreur de mise à jour : " + error.message);
       } else {
         closeEditModal();
-        loadProducts();
+        if (list_id !== currentListId) {
+          selectList(list_id);
+        } else {
+          loadProducts();
+        }
       }
     }
 
