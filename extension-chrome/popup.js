@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 1. Charger les listes depuis Supabase
   loadLists();
 
-  // 2. Extraire les métadonnées du produit depuis l'onglet actif
+  // 2. Extraire les métadonnées du produit depuis la page active
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   
   if (tab && tab.id) {
@@ -24,8 +24,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // 3. Clic sur Enregistrer
-  document.getElementById('addBtn').addEventListener('click', () => {
+  // 3. Clic sur Enregistrer : insertion directe en BDD sans ouvrir de nouvel onglet
+  document.getElementById('addBtn').addEventListener('click', async () => {
+    const statusEl = document.getElementById('status');
+    const addBtn = document.getElementById('addBtn');
+
     const title = document.getElementById('title').value.trim();
     const price = document.getElementById('price').value.trim();
     const store = document.getElementById('store').value.trim();
@@ -34,20 +37,76 @@ document.addEventListener('DOMContentLoaded', async () => {
     const comment = document.getElementById('comment').value.trim();
     const list_id = document.getElementById('listSelect').value;
 
-    if (!title || !url) {
-      document.getElementById('status').innerText = '⚠️ Titre et URL obligatoires.';
+    if (!title || !url || !list_id) {
+      statusEl.innerText = '⚠️ Titre, URL et Liste obligatoires.';
+      statusEl.style.color = '#ef4444';
       return;
     }
 
-    const payload = { title, price, store, image, comment };
-    if (list_id) payload.list_id = list_id;
+    statusEl.innerText = '⏳ Enregistrement...';
+    statusEl.style.color = '#6366f1';
+    addBtn.disabled = true;
 
-    const BASE_URL = "https://frodotitto.github.io/listes_cadeaux/";
-    
-    // Transmission des données vers le site sans déclencher le mode iOS
-    const targetUrl = `${BASE_URL}?add_url=${encodeURIComponent(url)}&js_data=${encodeURIComponent(JSON.stringify(payload))}`;
+    try {
+      const cleanUrl = SUPABASE_URL.replace(/\/$/, '');
 
-    chrome.tabs.create({ url: targetUrl });
+      // Vérification des doublons dans la même liste
+      const checkRes = await fetch(`${cleanUrl}/rest/v1/products?list_id=eq.${list_id}&url=eq.${encodeURIComponent(url)}`, {
+        method: 'GET',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      });
+      const existing = await checkRes.json();
+
+      if (existing && existing.length > 0) {
+        statusEl.innerText = '⚠️ Article déjà présent dans cette liste !';
+        statusEl.style.color = '#f59e0b';
+        addBtn.disabled = false;
+        return;
+      }
+
+      // Insertion du produit dans Supabase
+      const insertRes = await fetch(`${cleanUrl}/rest/v1/products`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({
+          title: title,
+          url: url,
+          image_url: image || 'https://via.placeholder.com/300',
+          store_name: store || 'Boutique',
+          price: price || 'Non renseigné',
+          comment: comment || '',
+          list_id: parseInt(list_id),
+          is_bought: false
+        })
+      });
+
+      if (!insertRes.ok) {
+        throw new Error(`Erreur HTTP: ${insertRes.status}`);
+      }
+
+      // Succès : affichage du message sans redirection
+      statusEl.innerText = '✅ Ajout terminé !';
+      statusEl.style.color = '#059669';
+
+      setTimeout(() => {
+        statusEl.innerText = '';
+        addBtn.disabled = false;
+      }, 3000);
+
+    } catch (err) {
+      console.error("Erreur lors de l'enregistrement :", err);
+      statusEl.innerText = '❌ Erreur lors de l\'enregistrement.';
+      statusEl.style.color = '#ef4444';
+      addBtn.disabled = false;
+    }
   });
 });
 
