@@ -2,35 +2,43 @@ const SUPABASE_URL = "https://glufuwoyxbyljnnthmbq.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdsdWZ1d295eGJ5bGpubnRobWJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3MTg4MjUsImV4cCI6MjEwNzI5NDgyNX0.Zi64NJ2qr07oZMCA8acwmD8f1fEP6NJN_DyO5IvrIUc";
 
 document.addEventListener('DOMContentLoaded', async () => {
-  await loadLists();
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  const status = document.getElementById('status');
+  
+  // Exécution du script d'extraction universelle (extract.js)
+  chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    files: ['extract.js']
+  }, (results) => {
+    if (results && results[0] && results[0].result) {
+      const data = results[0].result;
+      document.getElementById('title').value = data.title || '';
+      document.getElementById('price').value = data.price || '';
+      document.getElementById('store').value = data.store || '';
+      document.getElementById('image').value = data.image || '';
+      document.getElementById('url').value = tab.url || '';
+    }
+  });
 
-  let data = null;
-  try {
-    const [res] = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      files: ['extract.js']
-    });
-    data = res && res.result;
-  } catch (e) {
-    console.error('Extraction impossible', e);
-  }
+  document.getElementById('addBtn').addEventListener('click', () => {
+    const title = document.getElementById('title').value.trim();
+    const price = document.getElementById('price').value.trim();
+    const store = document.getElementById('store').value.trim();
+    const image = document.getElementById('image').value.trim();
+    const url = document.getElementById('url').value.trim();
+    const comment = document.getElementById('comment').value.trim();
 
-  if (!data) {
-    status.innerText = "❌ Échec de la lecture de la page.";
-    document.getElementById('title').value = tab.title || '';
-    document.getElementById('url').value = tab.url;
-    return;
-  }
+    if (!title || !url) {
+      document.getElementById('status').innerText = '⚠️ Titre et URL obligatoires.';
+      return;
+    }
 
-  const hasPrice = data.price && data.price !== 'Non renseigné';
-  document.getElementById('title').value = data.title || tab.title;
-  document.getElementById('price').value = hasPrice ? data.price : 'Voir site';
-  document.getElementById('store').value = data.store || new URL(tab.url).hostname.replace('www.', '');
-  document.getElementById('image').value = data.image || '';
-  document.getElementById('url').value = tab.url;
-  status.innerText = "✅ Infos extraites. Prêt ! " + JSON.stringify(data.src || {});
+    const payload = { title, price, store, image, comment };
+    
+    const BASE_URL = "https://frodotitto.github.io/listes_cadeaux/";
+    const targetUrl = `${BASE_URL}?quick_add=true&add_url=${encodeURIComponent(url)}&js_data=${encodeURIComponent(JSON.stringify(payload))}`;
+
+    chrome.tabs.create({ url: targetUrl });
+  });
 });
 
 async function loadLists() {
