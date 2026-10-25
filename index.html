@@ -14,7 +14,7 @@
     <div class="bg-white p-6 rounded-2xl shadow-2xl max-w-sm w-full text-center relative z-10">
       <div id="roleSelectionStep">
         <h2 class="text-2xl font-extrabold mb-2 text-indigo-600">Listes Cadeaux 🎁</h2>
-        <p class="text-xs text-slate-500 mb-6">Connexion</p>
+        <p class="text-xs text-slate-500 mb-6">Comment souhaitez-vous vous connecter ?</p>
         <div class="flex flex-col gap-3">
           <button type="button" onclick="selectRole('guest')" class="w-full bg-indigo-50 border-2 border-indigo-200 hover:bg-indigo-100 text-indigo-700 py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 cursor-pointer">
             <span>👥 Famille</span>
@@ -188,30 +188,6 @@
     const ACTUAL_ADMIN_HASH = getSecret(ACCESS_CODE_ADMIN_HASH);
     const ACTUAL_QUICK_HASH = getSecret(QUICK_ADD_TOKEN_HASH);
 
-    // Fonction de hachage SHA-256 dans le navigateur
-    async function hashString(str) {
-      const encoder = new TextEncoder();
-      const data = encoder.encode(str.trim());
-      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    }
-
-    async function validatePassword() {
-      const input = document.getElementById('passInput').value.trim();
-      const inputHash = await hashString(input);
-      const expectedHash = selectedRole === 'guest' ? ACTUAL_GUEST_HASH : ACTUAL_ADMIN_HASH;
-
-      if (expectedHash !== "" && inputHash === expectedHash) {
-        currentRole = selectedRole;
-        localStorage.setItem('user_role', currentRole);
-        if (isQuickAdd) unlockQuickAddMode();
-        else unlockSite();
-      } else {
-        document.getElementById('authError')?.classList.remove('hidden');
-      }
-    }
-
     let supabaseClient = null;
     let selectedRole = null;
     let currentRole = null;
@@ -220,6 +196,16 @@
     let currentProductsMap = {};
     let isQuickAdd = false;
     let draggedListId = null;
+
+    // Generer le hash SHA-256 d'une chaîne
+    async function hashString(str) {
+      if (!str) return "";
+      const encoder = new TextEncoder();
+      const data = encoder.encode(str.trim());
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
 
     function selectRole(role) {
       selectedRole = role;
@@ -257,11 +243,12 @@
       document.getElementById('passwordStep')?.classList.add('hidden');
     }
 
-    function validatePassword() {
+    async function validatePassword() {
       const input = document.getElementById('passInput').value.trim();
-      const expectedCode = selectedRole === 'guest' ? ACTUAL_GUEST_PASS : ACTUAL_ADMIN_PASS;
+      const inputHash = await hashString(input);
+      const expectedHash = selectedRole === 'guest' ? ACTUAL_GUEST_HASH : ACTUAL_ADMIN_HASH;
 
-      if (expectedCode !== "" && input === expectedCode) {
+      if (expectedHash !== "" && inputHash === expectedHash) {
         currentRole = selectedRole;
         localStorage.setItem('user_role', currentRole);
         if (isQuickAdd) unlockQuickAddMode();
@@ -309,7 +296,7 @@
       initApp();
     }
 
-    window.addEventListener('DOMContentLoaded', () => {
+    window.addEventListener('DOMContentLoaded', async () => {
       try {
         if (typeof window.supabase !== 'undefined' && ACTUAL_URL && ACTUAL_KEY) {
           supabaseClient = window.supabase.createClient(ACTUAL_URL, ACTUAL_KEY);
@@ -319,8 +306,9 @@
       const urlParams = new URLSearchParams(window.location.search);
       isQuickAdd = urlParams.get('quick_add') === 'true';
       const tokenParam = urlParams.get('token');
+      const tokenHash = tokenParam ? await hashString(tokenParam) : "";
 
-      if (isQuickAdd && tokenParam && ACTUAL_QUICK_TOKEN && tokenParam === ACTUAL_QUICK_TOKEN) {
+      if (isQuickAdd && tokenHash && ACTUAL_QUICK_HASH && tokenHash === ACTUAL_QUICK_HASH) {
         currentRole = 'admin';
         localStorage.setItem('user_role', 'admin');
         unlockQuickAddMode();
@@ -414,7 +402,6 @@
         .order('position', { ascending: true });
 
       if (error) {
-        // En cas d'absence de la colonne position, fallback sur id
         const { data: fallbackLists } = await supabaseClient.from('lists').select('*').order('id', { ascending: true });
         allLists = fallbackLists || [];
       } else {
