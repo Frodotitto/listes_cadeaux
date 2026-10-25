@@ -3,11 +3,10 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 document.addEventListener('DOMContentLoaded', async () => {
   // 1. Charger les listes depuis Supabase
-  loadLists();
+  await loadLists();
 
   // 2. Extraire les métadonnées du produit depuis la page active
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  
   if (tab && tab.id) {
     chrome.scripting.executeScript({
       target: { tabId: tab.id },
@@ -24,7 +23,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // 3. Clic sur Enregistrer : insertion directe en BDD sans ouvrir de nouvel onglet
+  // 3. Clic sur Enregistrer
   document.getElementById('addBtn').addEventListener('click', async () => {
     const statusEl = document.getElementById('status');
     const addBtn = document.getElementById('addBtn');
@@ -43,6 +42,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
+    // Sauvegarde de la liste choisie pour les prochains ajouts
+    localStorage.setItem('last_selected_list_id', list_id);
+
     statusEl.innerText = '⏳ Enregistrement...';
     statusEl.style.color = '#6366f1';
     addBtn.disabled = true;
@@ -50,7 +52,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const cleanUrl = SUPABASE_URL.replace(/\/$/, '');
 
-      // Vérification des doublons dans la même liste
+      // Vérification des doublons
       const checkRes = await fetch(`${cleanUrl}/rest/v1/products?list_id=eq.${list_id}&url=eq.${encodeURIComponent(url)}`, {
         method: 'GET',
         headers: {
@@ -67,7 +69,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
       }
 
-      // Insertion du produit dans Supabase
+      // Insertion du produit
       const insertRes = await fetch(`${cleanUrl}/rest/v1/products`, {
         method: 'POST',
         headers: {
@@ -92,7 +94,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         throw new Error(`Erreur HTTP: ${insertRes.status}`);
       }
 
-      // Succès : affichage du message sans redirection
       statusEl.innerText = '✅ Ajout terminé !';
       statusEl.style.color = '#059669';
 
@@ -126,11 +127,10 @@ async function loadLists() {
       }
     });
 
-    if (!response.ok) {
-      throw new Error(`Erreur HTTP: ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`Erreur HTTP: ${response.status}`);
 
     const lists = await response.json();
+    const lastSavedListId = localStorage.getItem('last_selected_list_id');
 
     select.innerHTML = '';
     if (Array.isArray(lists) && lists.length > 0) {
@@ -138,6 +138,10 @@ async function loadLists() {
         const opt = document.createElement('option');
         opt.value = l.id;
         opt.innerText = l.name;
+        // Sélectionne automatiquement la dernière liste utilisée si elle existe
+        if (lastSavedListId && String(l.id) === String(lastSavedListId)) {
+          opt.selected = true;
+        }
         select.appendChild(opt);
       });
     } else {
