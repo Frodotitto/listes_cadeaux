@@ -39,12 +39,18 @@ jobs:
         run: |
           node -e '
             const fs = require("fs");
+            const crypto = require("crypto");
+
+            function hash(str) {
+              return str ? crypto.createHash("sha256").update(str.trim()).digest("hex") : "";
+            }
+
             let content = fs.readFileSync("index.html", "utf8");
             content = content.split("__SUPABASE_URL__").join(process.env.SUPABASE_URL || "");
             content = content.split("__SUPABASE_KEY__").join(process.env.SUPABASE_KEY || "");
-            content = content.split("__GUEST_PASSWORD__").join(process.env.GUEST_PASSWORD || "");
-            content = content.split("__ADMIN_PASSWORD__").join(process.env.ADMIN_PASSWORD || "");
-            content = content.split("__QUICK_ADD_TOKEN__").join(process.env.QUICK_ADD_TOKEN || "");
+            content = content.split("__GUEST_PASSWORD__").join(hash(process.env.GUEST_PASSWORD));
+            content = content.split("__ADMIN_PASSWORD__").join(hash(process.env.ADMIN_PASSWORD));
+            content = content.split("__QUICK_ADD_TOKEN__").join(hash(process.env.QUICK_ADD_TOKEN));
             fs.writeFileSync("index.html", content, "utf8");
           '
 
