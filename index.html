@@ -29,7 +29,15 @@
         <button type="button" onclick="resetRoleSelection()" class="text-xs text-slate-400 hover:text-slate-600 mb-3 block mx-auto cursor-pointer">← Changer de mode</button>
         <h3 id="passwordTitle" class="text-lg font-bold mb-2 text-slate-800">Accès Restreint</h3>
         <p id="passwordSubtitle" class="text-xs text-slate-500 mb-4"></p>
-        <input type="password" id="passInput" class="w-full p-2.5 border rounded-xl mb-4 text-center text-lg font-bold tracking-widest focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="••••" onkeydown="if(event.key === 'Enter') validatePassword()">
+        
+        <!-- Boîte de saisie du mot de passe avec bouton œil -->
+        <div class="relative mb-4">
+          <input type="password" id="passInput" class="w-full p-2.5 pr-10 border rounded-xl text-center text-lg font-bold tracking-widest focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="••••" onkeydown="if(event.key === 'Enter') validatePassword()">
+          <button type="button" onclick="togglePasswordVisibility()" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer" title="Afficher/Masquer le mot de passe">
+            <span id="togglePasswordIcon">👁️</span>
+          </button>
+        </div>
+
         <button type="button" onclick="validatePassword()" class="w-full bg-indigo-600 text-white py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition cursor-pointer">Valider</button>
         <p id="authError" class="text-red-500 text-xs mt-3 hidden">Code incorrect. Réessayez.</p>
       </div>
@@ -194,6 +202,8 @@
       document.getElementById('roleSelectionStep')?.classList.add('hidden');
       document.getElementById('passwordStep')?.classList.remove('hidden');
       document.getElementById('passInput').value = '';
+      document.getElementById('passInput').type = 'password';
+      document.getElementById('togglePasswordIcon').innerText = '👁️';
       document.getElementById('authError')?.classList.add('hidden');
 
       if (role === 'guest') {
@@ -204,6 +214,18 @@
         document.getElementById('passwordSubtitle').innerText = "Entrez votre mot de passe administrateur pour gérer les articles.";
       }
       setTimeout(() => document.getElementById('passInput')?.focus(), 100);
+    }
+
+    function togglePasswordVisibility() {
+      const passInput = document.getElementById('passInput');
+      const icon = document.getElementById('togglePasswordIcon');
+      if (passInput.type === 'password') {
+        passInput.type = 'text';
+        icon.innerText = '🙈';
+      } else {
+        passInput.type = 'password';
+        icon.innerText = '👁️';
+      }
     }
 
     function resetRoleSelection() {
@@ -600,10 +622,7 @@
         currentProductsMap[product.id] = product;
         const isGuest = currentRole === 'guest';
         
-        // Côté Famille : l'état d'achat est TOUJOURS visible
         const showBoughtToGuest = isGuest && product.is_bought;
-        
-        // Côté Administrateur : l'état est visible SEULEMENT si l'option hide_status est décochée (false)
         const showBoughtToAdmin = !isGuest && !isListHiddenFromAdmin && product.is_bought;
 
         const card = document.createElement('div');
