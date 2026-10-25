@@ -322,18 +322,30 @@
 
     async function initApp() {
       await loadLists();
-
+    
+      // Écouteur pour enregistrer immédiatement le changement de liste dans le formulaire web / iOS
+      const formSelect = document.getElementById('formListSelect');
+      if (formSelect) {
+        formSelect.addEventListener('change', (e) => {
+          const selectedId = parseInt(e.target.value);
+          if (selectedId) {
+            currentListId = selectedId;
+            localStorage.setItem('active_list_id', selectedId);
+          }
+        });
+      }
+    
       const urlParams = new URLSearchParams(window.location.search);
       const addUrl = urlParams.get('add_url');
-
+    
       if (addUrl) {
         let decodedUrl = decodeURIComponent(addUrl);
         if (!decodedUrl.startsWith('http://') && !decodedUrl.startsWith('https://')) {
           decodedUrl = 'https://' + decodedUrl.replace(/^(2f|%2f|\/)+/i, '');
         }
-
+    
         document.getElementById('productUrl').value = decodedUrl;
-
+    
         const jsDataParam = urlParams.get('js_data');
         if (jsDataParam) {
           try {
@@ -343,15 +355,27 @@
             if (parsed.image) document.getElementById('productImage').value = parsed.image;
             if (parsed.store) document.getElementById('productStore').value = parsed.store;
             if (parsed.comment) document.getElementById('productComment').value = parsed.comment;
+    
+            // Si une liste spécifique est transmise dans le payload, on la sélectionne et on la mémorise
+            if (parsed.list_id) {
+              currentListId = parseInt(parsed.list_id);
+              localStorage.setItem('active_list_id', currentListId);
+              updateListDropdown();
+            }
           } catch(e) {}
         }
-
+    
+        // Pré-sélectionne la liste mémorisée dans le menu déroulant
+        if (formSelect && currentListId) {
+          formSelect.value = currentListId;
+        }
+    
         try {
           if (!document.getElementById('productStore').value) {
             document.getElementById('productStore').value = new URL(decodedUrl).hostname.replace('www.', '');
           }
         } catch(e) {}
-
+    
         if (document.getElementById('productTitle').value || document.getElementById('productPrice').value) {
           document.getElementById('fetchStatus').innerText = "✅ Informations extraites de la page !";
         } else {
