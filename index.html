@@ -9,15 +9,12 @@
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans min-h-screen p-4 md:p-8">
 
-  <!-- Modal de connexion (Choix du rôle & Mot de passe) -->
+  <!-- Modal de connexion -->
   <div id="authModal" class="fixed inset-0 bg-slate-900 bg-opacity-80 flex items-center justify-center z-50 p-4">
     <div class="bg-white p-6 rounded-2xl shadow-2xl max-w-sm w-full text-center relative z-10">
-      
-      <!-- Étape 1 : Choix du Mode -->
       <div id="roleSelectionStep">
         <h2 class="text-2xl font-extrabold mb-2 text-indigo-600">Mes Envies 🎁</h2>
         <p class="text-xs text-slate-500 mb-6">Comment souhaitez-vous vous connecter ?</p>
-        
         <div class="flex flex-col gap-3">
           <button type="button" onclick="selectRole('guest')" class="w-full bg-indigo-50 border-2 border-indigo-200 hover:bg-indigo-100 text-indigo-700 py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 cursor-pointer">
             <span>👥 Visiteur / Proche</span>
@@ -28,25 +25,45 @@
         </div>
       </div>
 
-      <!-- Étape 2 : Saisie du Mot de Passe -->
       <div id="passwordStep" class="hidden">
         <button type="button" onclick="resetRoleSelection()" class="text-xs text-slate-400 hover:text-slate-600 mb-3 block mx-auto cursor-pointer">← Changer de mode</button>
         <h3 id="passwordTitle" class="text-lg font-bold mb-2 text-slate-800">Accès Restreint</h3>
         <p id="passwordSubtitle" class="text-xs text-slate-500 mb-4"></p>
-
-        <input 
-          type="password" 
-          id="passInput" 
-          class="w-full p-2.5 border rounded-xl mb-4 text-center text-lg font-bold tracking-widest focus:ring-2 focus:ring-indigo-500 outline-none" 
-          placeholder="••••"
-          onkeydown="if(event.key === 'Enter') validatePassword()"
-        >
-        <button type="button" onclick="validatePassword()" class="w-full bg-indigo-600 text-white py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition cursor-pointer">
-          Valider
-        </button>
+        <input type="password" id="passInput" class="w-full p-2.5 border rounded-xl mb-4 text-center text-lg font-bold tracking-widest focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="••••" onkeydown="if(event.key === 'Enter') validatePassword()">
+        <button type="button" onclick="validatePassword()" class="w-full bg-indigo-600 text-white py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition cursor-pointer">Valider</button>
         <p id="authError" class="text-red-500 text-xs mt-3 hidden">Code incorrect. Réessayez.</p>
       </div>
+    </div>
+  </div>
 
+  <!-- Modal de création / édition d'une liste -->
+  <div id="listModal" class="fixed inset-0 bg-slate-900 bg-opacity-80 flex items-center justify-center z-50 p-4 hidden">
+    <div class="bg-white p-6 rounded-2xl shadow-2xl max-w-sm w-full relative z-10">
+      <div class="flex justify-between items-center mb-4 border-b pb-2">
+        <h3 id="listModalTitle" class="text-lg font-bold text-slate-800">🎁 Nouvelle Liste</h3>
+        <button type="button" onclick="closeListModal()" class="text-slate-400 hover:text-slate-600 font-bold text-lg">✕</button>
+      </div>
+
+      <input type="hidden" id="editListId">
+      <div class="mb-4">
+        <label class="block text-xs font-semibold text-slate-500 mb-1">Nom de la liste :</label>
+        <input type="text" id="listNameInput" placeholder="ex: Noël, Anniversaire..." class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+      </div>
+
+      <div class="mb-6 bg-slate-50 p-3 rounded-xl border">
+        <label class="flex items-center gap-3 cursor-pointer">
+          <input type="checkbox" id="listHideStatusInput" class="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500">
+          <div>
+            <span class="block text-xs font-bold text-slate-700">Masquer le statut d'achat au créateur</span>
+            <span class="block text-[10px] text-slate-500">Garde la surprise pour vous. Les visiteurs verront toujours les réservations pour éviter les doublons.</span>
+          </div>
+        </label>
+      </div>
+
+      <div class="flex gap-2 justify-end">
+        <button type="button" onclick="closeListModal()" class="px-4 py-2 bg-slate-200 text-slate-700 font-bold rounded-lg text-sm hover:bg-slate-300">Annuler</button>
+        <button type="button" onclick="saveList()" class="px-4 py-2 bg-indigo-600 text-white font-bold rounded-lg text-sm hover:bg-indigo-700">💾 Enregistrer</button>
+      </div>
     </div>
   </div>
 
@@ -59,7 +76,6 @@
       </div>
 
       <input type="hidden" id="editProductId">
-
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
         <div>
           <label class="block text-xs font-semibold text-slate-500 mb-1">Titre :</label>
@@ -107,12 +123,9 @@
         <h1 class="text-3xl font-extrabold text-indigo-600">Mes Envies 🎁</h1>
         <p class="text-slate-500 text-sm" id="roleBadge">Chargement...</p>
       </div>
-      <button type="button" onclick="logout()" class="text-xs bg-slate-200 px-3 py-1.5 rounded-full hover:bg-slate-300 font-medium text-slate-700">
-        🚪 Déconnexion
-      </button>
+      <button type="button" onclick="logout()" class="text-xs bg-slate-200 px-3 py-1.5 rounded-full hover:bg-slate-300 font-medium text-slate-700">🚪 Déconnexion</button>
     </header>
 
-    <!-- Formulaire d'ajout (Créateur / Mode Quick Add) -->
     <section id="adminSection" class="hidden bg-white p-6 rounded-xl shadow-sm border mb-8">
       <h2 class="text-lg font-bold mb-4 text-slate-700" id="formHeaderTitle">➕ Ajouter un article</h2>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -137,26 +150,19 @@
         <input type="url" id="productImage" placeholder="URL de l'image" class="p-2 border rounded-lg text-sm">
       </div>
 
-      <!-- Champ Commentaire libre -->
       <div class="mb-4">
-        <label class="block text-xs font-semibold text-slate-500 mb-1">Commentaire / Remarques (taille, couleur, détails...) :</label>
+        <label class="block text-xs font-semibold text-slate-500 mb-1">Commentaire / Remarques :</label>
         <textarea id="productComment" rows="2" placeholder="Ex: Prendre la couleur bleue en taille L" class="w-full p-2 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
       </div>
 
-      <button type="button" onclick="saveProduct()" class="w-full mt-2 bg-emerald-600 text-white py-2.5 rounded-lg font-bold hover:bg-emerald-700 text-sm">
-        💾 Enregistrer dans la liste
-      </button>
+      <button type="button" onclick="saveProduct()" class="w-full mt-2 bg-emerald-600 text-white py-2.5 rounded-lg font-bold hover:bg-emerald-700 text-sm">💾 Enregistrer dans la liste</button>
     </section>
 
-    <!-- Onglets de listes -->
     <div id="tabsContainer" class="flex flex-wrap gap-2 mb-6 border-b pb-3"></div>
-
-    <!-- Grille des cartes produits -->
     <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="productList"></section>
   </main>
 
   <script>
-    // Variables injectées par GitHub Actions au déploiement
     const SUPABASE_URL = "__SUPABASE_URL__";
     const SUPABASE_KEY = "__SUPABASE_KEY__";
     const ACCESS_CODE_GUEST = "__GUEST_PASSWORD__";
@@ -185,16 +191,10 @@
 
     function selectRole(role) {
       selectedRole = role;
-      
-      const roleStep = document.getElementById('roleSelectionStep');
-      const passStep = document.getElementById('passwordStep');
-      const authError = document.getElementById('authError');
-      const passInput = document.getElementById('passInput');
-
-      if (roleStep) roleStep.classList.add('hidden');
-      if (passStep) passStep.classList.remove('hidden');
-      if (passInput) passInput.value = '';
-      if (authError) authError.classList.add('hidden');
+      document.getElementById('roleSelectionStep')?.classList.add('hidden');
+      document.getElementById('passwordStep')?.classList.remove('hidden');
+      document.getElementById('passInput').value = '';
+      document.getElementById('authError')?.classList.add('hidden');
 
       if (role === 'guest') {
         document.getElementById('passwordTitle').innerText = "Accès Visiteur";
@@ -203,17 +203,12 @@
         document.getElementById('passwordTitle').innerText = "Accès Créateur";
         document.getElementById('passwordSubtitle').innerText = "Entrez votre mot de passe créateur pour gérer les articles.";
       }
-
-      if (passInput) {
-        setTimeout(() => passInput.focus(), 100);
-      }
+      setTimeout(() => document.getElementById('passInput')?.focus(), 100);
     }
 
     function resetRoleSelection() {
-      const roleStep = document.getElementById('roleSelectionStep');
-      const passStep = document.getElementById('passwordStep');
-      if (roleStep) roleStep.classList.remove('hidden');
-      if (passStep) passStep.classList.add('hidden');
+      document.getElementById('roleSelectionStep')?.classList.remove('hidden');
+      document.getElementById('passwordStep')?.classList.add('hidden');
     }
 
     function validatePassword() {
@@ -226,8 +221,7 @@
         if (isQuickAdd) unlockQuickAddMode();
         else unlockSite();
       } else {
-        const errorEl = document.getElementById('authError');
-        if (errorEl) errorEl.classList.remove('hidden');
+        document.getElementById('authError')?.classList.remove('hidden');
       }
     }
 
@@ -238,33 +232,24 @@
     }
 
     function unlockQuickAddMode() {
-      const modal = document.getElementById('authModal');
-      const appContent = document.getElementById('appContent');
-
-      if (modal) modal.classList.add('hidden');
-      if (appContent) appContent.classList.remove('opacity-10', 'pointer-events-none');
-
+      document.getElementById('authModal')?.classList.add('hidden');
+      document.getElementById('appContent')?.classList.remove('opacity-10', 'pointer-events-none');
       document.getElementById('mainHeader')?.classList.add('hidden');
       document.getElementById('tabsContainer')?.classList.add('hidden');
       document.getElementById('productList')?.classList.add('hidden');
-
       document.getElementById('adminSection')?.classList.remove('hidden');
       document.getElementById('formHeaderTitle').innerText = "⚡ Ajout rapide iOS";
-
       initApp();
     }
 
     function unlockSite() {
-      const modal = document.getElementById('authModal');
-      const appContent = document.getElementById('appContent');
-
-      if (modal) modal.classList.add('hidden');
-      if (appContent) appContent.classList.remove('opacity-10', 'pointer-events-none');
+      document.getElementById('authModal')?.classList.add('hidden');
+      document.getElementById('appContent')?.classList.remove('opacity-10', 'pointer-events-none');
       
       const roleBadge = document.getElementById('roleBadge');
       if (currentRole === 'admin') {
         if (roleBadge) {
-          roleBadge.innerText = "Mode Créateur (Surprise préservée)";
+          roleBadge.innerText = "Mode Créateur";
           roleBadge.className = "text-indigo-600 text-sm font-bold";
         }
         document.getElementById('adminSection')?.classList.remove('hidden');
@@ -275,7 +260,6 @@
         }
         document.getElementById('adminSection')?.classList.add('hidden');
       }
-
       initApp();
     }
 
@@ -284,9 +268,7 @@
         if (typeof window.supabase !== 'undefined' && ACTUAL_URL && ACTUAL_KEY) {
           supabaseClient = window.supabase.createClient(ACTUAL_URL, ACTUAL_KEY);
         }
-      } catch(e) {
-        console.error("Erreur d'initialisation Supabase :", e);
-      }
+      } catch(e) {}
 
       const urlParams = new URLSearchParams(window.location.search);
       isQuickAdd = urlParams.get('quick_add') === 'true';
@@ -300,7 +282,6 @@
       }
 
       const savedRole = localStorage.getItem('user_role');
-
       if (isQuickAdd) {
         if (savedRole === 'admin') {
           currentRole = 'admin';
@@ -360,13 +341,9 @@
     async function loadLists() {
       if (!supabaseClient) return;
       const { data: lists, error } = await supabaseClient.from('lists').select('*').order('id', { ascending: true });
-      if (error) {
-        console.error("Erreur chargement listes :", error);
-        return;
-      }
+      if (error) return;
       allLists = lists || [];
 
-      // Restauration de la liste précédemment active ou choix de la 1ère par défaut
       const savedListId = parseInt(localStorage.getItem('active_list_id'));
       const listExists = allLists.some(l => l.id === savedListId);
 
@@ -386,6 +363,7 @@
       const container = document.getElementById('tabsContainer');
       if (!container) return;
       container.innerHTML = '';
+
       allLists.forEach(list => {
         const isSelected = list.id === currentListId;
         const btn = document.createElement('button');
@@ -395,12 +373,12 @@
         let actionsHtml = '';
         if (currentRole === 'admin') {
           actionsHtml = `
-            <span onclick="renameList(event, ${list.id}, '${list.name.replace(/'/g, "\\'")}')" title="Renommer la liste" class="hover:text-amber-300 ml-1">✏️</span>
+            <span onclick="openEditListModal(event, ${list.id})" title="Paramètres de la liste" class="hover:text-amber-300 ml-1">✏️</span>
             <span onclick="deleteList(event, ${list.id})" title="Supprimer la liste" class="hover:text-red-300">✕</span>
           `;
         }
 
-        btn.innerHTML = `<span>🎁 ${list.name}</span>${actionsHtml}`;
+        btn.innerHTML = `<span>🎁 ${list.name}${currentRole === 'admin' && list.hide_status ? ' 🔒' : ''}</span>${actionsHtml}`;
         btn.onclick = () => selectList(list.id);
         container.appendChild(btn);
       });
@@ -410,7 +388,7 @@
         addBtn.type = 'button';
         addBtn.className = 'px-3 py-2 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-300 hover:bg-emerald-200 cursor-pointer';
         addBtn.innerText = '➕ Nouvelle Liste';
-        addBtn.onclick = createNewList;
+        addBtn.onclick = () => openCreateListModal();
         container.appendChild(addBtn);
       }
     }
@@ -423,38 +401,63 @@
       if (!isQuickAdd) loadProducts(); 
     }
 
-    async function createNewList() {
-      if (!supabaseClient) return alert("Base de données non initialisée.");
-      const name = prompt("Nom de la liste (ex: Naissance, Crémaillère) :");
-      if (!name || !name.trim()) return;
-      const { data, error } = await supabaseClient.from('lists').insert([{ name: name.trim() }]).select();
-      if (error) return alert("Erreur création liste : " + error.message);
-      await loadLists();
-      if (data && data[0]) selectList(data[0].id);
+    function openCreateListModal() {
+      document.getElementById('listModalTitle').innerText = "🎁 Nouvelle Liste";
+      document.getElementById('editListId').value = "";
+      document.getElementById('listNameInput').value = "";
+      document.getElementById('listHideStatusInput').checked = true; // Masqué au créateur par défaut
+      document.getElementById('listModal').classList.remove('hidden');
     }
 
-    async function renameList(e, id, currentName) {
-      if (!supabaseClient) return;
+    function openEditListModal(e, id) {
       e.stopPropagation();
-      const newName = prompt("Nouveau nom de la liste :", currentName);
-      if (!newName || !newName.trim() || newName.trim() === currentName) return;
+      const list = allLists.find(l => l.id === id);
+      if (!list) return;
 
-      const { error } = await supabaseClient
-        .from('lists')
-        .update({ name: newName.trim() })
-        .eq('id', id);
+      document.getElementById('listModalTitle').innerText = "✏️ Paramètres de la Liste";
+      document.getElementById('editListId').value = list.id;
+      document.getElementById('listNameInput').value = list.name || "";
+      document.getElementById('listHideStatusInput').checked = !!list.hide_status;
+      document.getElementById('listModal').classList.remove('hidden');
+    }
 
-      if (error) {
-        alert("Erreur lors du changement de nom : " + error.message);
+    function closeListModal() {
+      document.getElementById('listModal').classList.add('hidden');
+    }
+
+    async function saveList() {
+      if (!supabaseClient) return;
+      const id = document.getElementById('editListId').value;
+      const name = document.getElementById('listNameInput').value.trim();
+      const hide_status = document.getElementById('listHideStatusInput').checked;
+
+      if (!name) return alert("Le nom de la liste est obligatoire.");
+
+      if (id) {
+        const { error } = await supabaseClient
+          .from('lists')
+          .update({ name, hide_status })
+          .eq('id', parseInt(id));
+
+        if (error) return alert("Erreur lors de la mise à jour : " + error.message);
       } else {
-        await loadLists();
+        const { data, error } = await supabaseClient
+          .from('lists')
+          .insert([{ name, hide_status }])
+          .select();
+
+        if (error) return alert("Erreur création liste : " + error.message);
+        if (data && data[0]) currentListId = data[0].id;
       }
+
+      closeListModal();
+      await loadLists();
     }
 
     async function deleteList(e, id) {
       if (!supabaseClient) return;
       e.stopPropagation();
-      if (!confirm("Supprimer cette liste et ses articles ?")) return;
+      if (!confirm("Supprimer cette liste et tous ses articles ?")) return;
       await supabaseClient.from('lists').delete().eq('id', id);
       if (currentListId === id) {
         localStorage.removeItem('active_list_id');
@@ -580,12 +583,12 @@
         return;
       }
 
+      const currentList = allLists.find(l => l.id === currentListId);
+      const isListHiddenFromAdmin = currentList ? !!currentList.hide_status : false;
+
       const { data: products, error } = await supabaseClient.from('products').select('*').eq('list_id', currentListId).order('created_at', { ascending: false });
       
-      if (error) {
-        console.error("Erreur chargement produits :", error);
-        return;
-      }
+      if (error) return;
 
       currentProductsMap = {};
       if (!products || products.length === 0) {
@@ -596,10 +599,15 @@
       products.forEach(product => {
         currentProductsMap[product.id] = product;
         const isGuest = currentRole === 'guest';
-        const showBoughtStatus = isGuest && product.is_bought;
+        
+        // Côté Visiteur : l'état d'achat est TOUJOURS visible
+        const showBoughtToGuest = isGuest && product.is_bought;
+        
+        // Côté Admin : l'état est visible SEULEMENT si l'option hide_status est décochée (false)
+        const showBoughtToAdmin = !isGuest && !isListHiddenFromAdmin && product.is_bought;
 
         const card = document.createElement('div');
-        card.className = `bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col justify-between ${showBoughtStatus ? 'opacity-60 bg-slate-100' : ''}`;
+        card.className = `bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col justify-between ${showBoughtToGuest ? 'opacity-60 bg-slate-100' : ''}`;
         card.innerHTML = `
           <div>
             <div class="h-48 overflow-hidden bg-slate-100 relative">
@@ -607,7 +615,8 @@
                    referrerpolicy="no-referrer"
                    onerror="this.onerror=null; this.src='https://images.weserv.nl/?url=' + encodeURIComponent('${product.image_url}');"
                    class="w-full h-full object-contain p-2">
-              ${showBoughtStatus ? '<span class="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded font-bold">🎁 Déjà offert</span>' : ''}
+              ${showBoughtToGuest ? `<span class="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded font-bold">🎁 Déjà offert (${product.bought_by || 'par un proche'})</span>` : ''}
+              ${showBoughtToAdmin ? `<span class="absolute top-2 left-2 bg-emerald-600 text-white text-xs px-2 py-1 rounded font-bold">✓ Réservé (${product.bought_by})</span>` : ''}
               ${currentRole === 'admin' ? `
                 <div class="absolute top-2 right-2 flex gap-1">
                   <button type="button" onclick="openEditModal(${product.id})" class="bg-slate-800 bg-opacity-70 text-white p-1.5 rounded-full hover:bg-indigo-600 transition text-xs cursor-pointer">✏️</button>
@@ -625,12 +634,24 @@
           <div class="p-4 border-t bg-slate-50 flex flex-col gap-2">
             <a href="${product.url}" target="_blank" class="text-center text-xs text-indigo-600 hover:underline">Voir l'article d'origine ↗</a>
             <a href="https://www.google.com/search?tbm=shop&q=${encodeURIComponent(product.title)}" target="_blank" class="text-center text-xs text-slate-500 hover:underline">🔍 Comparer les prix</a>
-            ${currentRole === 'admin' ? `
-              <div class="text-center text-xs text-indigo-600 bg-indigo-50 font-medium py-2 rounded-lg border border-indigo-100">
-                🔒 Statut d'achat masqué pour garder la surprise !
+            ${currentRole === 'admin' ? (
+              isListHiddenFromAdmin ? `
+                <div class="text-center text-xs text-indigo-600 bg-indigo-50 font-medium py-2 rounded-lg border border-indigo-100">
+                  🔒 Statut d'achat masqué pour garder la surprise !
+                </div>
+              ` : product.is_bought ? `
+                <div class="text-center text-xs text-emerald-700 bg-emerald-50 font-bold py-2 rounded-lg border border-emerald-200">
+                  ✓ Réservé par ${product.bought_by || 'un proche'}
+                </div>
+              ` : `
+                <div class="text-center text-xs text-slate-500 bg-slate-100 py-2 rounded-lg border">
+                  Disponible
+                </div>
+              `
+            ) : product.is_bought ? `
+              <div class="text-center text-xs text-red-600 bg-red-50 font-bold py-2 rounded-lg border border-red-100">
+                🎁 Déjà réservé par ${product.bought_by || 'un proche'}
               </div>
-            ` : product.is_bought ? `
-              <p class="text-center text-xs text-slate-500 italic py-1">Réservé par ${product.bought_by || 'un proche'}</p>
             ` : `
               <button type="button" onclick="markAsBought(${product.id})" class="w-full bg-emerald-600 text-white text-xs font-bold py-2 rounded hover:bg-emerald-700 transition cursor-pointer">Offrir cet article</button>
             `}
@@ -677,24 +698,15 @@
       if (!title || !url || !list_id) return alert("Champs obligatoires manquants.");
 
       const { error } = await supabaseClient.from('products').update({
-        title,
-        price,
-        store_name,
-        url,
-        image_url,
-        comment,
-        list_id
+        title, price, store_name, url, image_url, comment, list_id
       }).eq('id', id);
 
       if (error) {
         alert("Erreur de mise à jour : " + error.message);
       } else {
         closeEditModal();
-        if (list_id !== currentListId) {
-          selectList(list_id);
-        } else {
-          loadProducts();
-        }
+        if (list_id !== currentListId) selectList(list_id);
+        else loadProducts();
       }
     }
 
