@@ -50,16 +50,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function loadLists() {
   const select = document.getElementById('listSelect');
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/lists?select=*&order=id.asc`, {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/lists?select=id,name&order=id.asc`, {
+      method: 'GET',
       headers: {
         'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json'
       }
     });
-    const lists = await res.json();
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const lists = await response.json();
 
     select.innerHTML = '';
-    if (lists && lists.length > 0) {
+    if (Array.isArray(lists) && lists.length > 0) {
       lists.forEach(l => {
         const opt = document.createElement('option');
         opt.value = l.id;
@@ -70,6 +77,7 @@ async function loadLists() {
       select.innerHTML = '<option value="">Aucune liste disponible</option>';
     }
   } catch (err) {
+    console.error("Erreur de récupération des listes :", err);
     select.innerHTML = '<option value="">Erreur de chargement</option>';
   }
 }
