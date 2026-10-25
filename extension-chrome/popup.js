@@ -3,33 +3,35 @@ const SUPABASE_URL = "__SUPABASE_URL__";
 const SUPABASE_KEY = "__SUPABASE_KEY__";
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // 1. Chargement dynamique des listes depuis Supabase
+  // 1. Charger les listes depuis Supabase
   loadLists();
 
-  // 2. Extraction des infos de la page via extract.js
+  // 2. Extraire les métadonnées du produit
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   
-  chrome.scripting.executeScript({
-    target: { tabId: tab.id },
-    files: ['extract.js']
-  }, (results) => {
-    if (results && results[0] && results[0].result) {
-      const data = results[0].result;
-      document.getElementById('title').value = data.title || '';
-      document.getElementById('price').value = data.price || '';
-      document.getElementById('store').value = data.store || '';
-      document.getElementById('image').value = data.image || '';
-      document.getElementById('url').value = tab.url || '';
-    }
-  });
+  if (tab && tab.id) {
+    chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ['extract.js']
+    }, (results) => {
+      if (results && results[0] && results[0].result) {
+        const data = results[0].result;
+        document.getElementById('title').value = data.title || '';
+        document.getElementById('price').value = data.price || '';
+        document.getElementById('store').value = data.store || '';
+        document.getElementById('image').value = data.image || '';
+        document.getElementById('url').value = tab.url || '';
+      }
+    });
+  }
 
-  // 3. Soumission vers l'application
+  // 3. Clic sur Enregistrer
   document.getElementById('addBtn').addEventListener('click', () => {
     const title = document.getElementById('title').value.trim();
     const price = document.getElementById('price').value.trim();
     const store = document.getElementById('store').value.trim();
     const image = document.getElementById('image').value.trim();
-    const url = document.getElementById('url').value.trim();
+    const url = document.getElementById('productUrl') ? document.getElementById('productUrl').value.trim() : document.getElementById('url').value.trim();
     const comment = document.getElementById('comment').value.trim();
     const list_id = document.getElementById('listSelect').value;
 
@@ -38,10 +40,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    const payload = { title, price, store, image, comment, list_id };
-    
+    const payload = { title, price, store, image, comment };
+    if (list_id) payload.list_id = list_id;
+
     const BASE_URL = "https://frodotitto.github.io/listes_cadeaux/";
-    const targetUrl = `${BASE_URL}?quick_add=true&add_url=${encodeURIComponent(url)}&js_data=${encodeURIComponent(JSON.stringify(payload))}`;
+    
+    // On passe par add_url et js_data SANS quick_add=true pour charger le site normal
+    const targetUrl = `${BASE_URL}?add_url=${encodeURIComponent(url)}&js_data=${encodeURIComponent(JSON.stringify(payload))}`;
 
     chrome.tabs.create({ url: targetUrl });
   });
@@ -49,8 +54,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function loadLists() {
   const select = document.getElementById('listSelect');
+  if (!select) return;
+
   try {
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/lists?select=id,name&order=id.asc`, {
+    // S'assurer que l'URL ne termine pas par un slash
+    const cleanUrl = SUPABASE_URL.replace(/\/$/, '');
+    
+    const response = await fetch(`${cleanUrl}/rest/v1/lists?select=id,name&order=id.asc`, {
       method: 'GET',
       headers: {
         'apikey': SUPABASE_KEY,
@@ -60,7 +70,7 @@ async function loadLists() {
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(`Erreur HTTP: ${response.status}`);
     }
 
     const lists = await response.json();
