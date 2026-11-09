@@ -252,10 +252,25 @@
 
     async function validatePassword() {
       const input = document.getElementById('passInput').value.trim();
+      if (!input) return;
+    
       const inputHash = await hashString(input);
-      const expectedHash = selectedRole === 'guest' ? ACTUAL_GUEST_HASH : ACTUAL_ADMIN_HASH;
-
-      if (expectedHash !== "" && inputHash === expectedHash) {
+      
+      // On récupère la valeur stockée (en clair ou déjà hachée)
+      const rawExpected = selectedRole === 'guest' ? ACTUAL_GUEST_HASH : ACTUAL_ADMIN_HASH;
+      if (!rawExpected) {
+        document.getElementById('authError')?.classList.remove('hidden');
+        return;
+      }
+    
+      // Si rawExpected est déjà un hash SHA-256 (64 caractères hexadécimaux)
+      let expectedHash = rawExpected;
+      if (rawExpected.length !== 64 || !/^[0-9a-f]+$/i.test(rawExpected)) {
+        // Sinon, on calcule son hash pour comparer deux empreintes SHA-256
+        expectedHash = await hashString(rawExpected);
+      }
+    
+      if (inputHash.toLowerCase() === expectedHash.toLowerCase()) {
         currentRole = selectedRole;
         localStorage.setItem('user_role', currentRole);
         if (isQuickAdd) unlockQuickAddMode();
