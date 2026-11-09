@@ -1,12 +1,12 @@
 /*
- * extract.js : extraction universelle (prix, titre, image, marchand) d'une page produit.
+ * extract.js : extraction universelle (prix, titre, image, marchand, quantité) d'une page produit.
  *
  * Un seul fichier pour les deux usages :
  *  - iPhone : à coller tel quel dans « Exécuter JavaScript sur la page web » (Raccourcis).
  *             Il renvoie {"url": "..."} via completion().
  *  - PC     : injecté par l'extension avec
  *             chrome.scripting.executeScript({ target: { tabId }, files: ['extract.js'] })
- *             Il renvoie directement l'objet {price, title, image, store, src}.
+ *             Il renvoie directement l'objet {price, title, image, store, quantity, src}.
  */
 (function () {
   var BASE = 'https://frodotitto.github.io/listes_cadeaux/';
@@ -404,11 +404,22 @@
       store = 'Fnac';
     }
 
+    // Extraction optionnelle de la quantité sélectionnée sur la page marchand (défaut 1)
+    var quantity = (function() {
+      var qEl = document.querySelector('select[name*="quantity" i], input[name*="quantity" i], select[id*="quantity" i], input[id*="quantity" i]');
+      if (qEl) {
+        var v = parseInt(qEl.value);
+        if (!isNaN(v) && v > 0) return v;
+      }
+      return 1;
+    })();
+
     return {
       price: price || 'Non renseigné',
       title: title || 'Produit sans titre',
       image: image,
       store: store,
+      quantity: quantity,
       src: src
     };
   }
