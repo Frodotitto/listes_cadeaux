@@ -43,6 +43,34 @@
     </div>
   </div>
 
+  <!-- Modal de réservation (Prénom + Quantité regroupés) -->
+  <div id="buyModal" class="fixed inset-0 bg-slate-900 bg-opacity-80 flex items-center justify-center z-50 p-4 hidden">
+    <div class="bg-white p-6 rounded-2xl shadow-2xl max-w-sm w-full relative z-10">
+      <div class="flex justify-between items-center mb-4 border-b pb-2">
+        <h3 class="text-lg font-bold text-slate-800">🎁 Offrir cet article</h3>
+        <button type="button" onclick="closeBuyModal()" class="text-slate-400 hover:text-slate-600 font-bold text-lg cursor-pointer">✕</button>
+      </div>
+
+      <input type="hidden" id="buyProductId">
+      <input type="hidden" id="buyMaxQty">
+
+      <div class="mb-4">
+        <label class="block text-xs font-semibold text-slate-500 mb-1">Votre prénom :</label>
+        <input type="text" id="buyerNameInput" placeholder="ex: Adeline, Martin..." class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none" onkeydown="if(event.key === 'Enter') confirmBuy()">
+      </div>
+
+      <div class="mb-6" id="buyQtyContainer">
+        <label class="block text-xs font-semibold text-slate-500 mb-1" id="buyQtyLabel">Quantité à offrir :</label>
+        <input type="number" id="buyerQtyInput" min="1" value="1" class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+      </div>
+
+      <div class="flex gap-2 justify-end">
+        <button type="button" onclick="closeBuyModal()" class="px-4 py-2 bg-slate-200 text-slate-700 font-bold rounded-lg text-sm hover:bg-slate-300 cursor-pointer">Annuler</button>
+        <button type="button" onclick="confirmBuy()" class="px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg text-sm hover:bg-emerald-700 cursor-pointer">🎁 Confirmer la réservation</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal de création / édition d'une liste -->
   <div id="listModal" class="fixed inset-0 bg-slate-900 bg-opacity-80 flex items-center justify-center z-50 p-4 hidden">
     <div class="bg-white p-6 rounded-2xl shadow-2xl max-w-sm w-full relative z-10">
@@ -253,23 +281,20 @@
     async function validatePassword() {
       const input = document.getElementById('passInput').value.trim();
       if (!input) return;
-    
+
       const inputHash = await hashString(input);
-      
-      // On récupère la valeur stockée (en clair ou déjà hachée)
       const rawExpected = selectedRole === 'guest' ? ACTUAL_GUEST_HASH : ACTUAL_ADMIN_HASH;
+
       if (!rawExpected) {
         document.getElementById('authError')?.classList.remove('hidden');
         return;
       }
-    
-      // Si rawExpected est déjà un hash SHA-256 (64 caractères hexadécimaux)
+
       let expectedHash = rawExpected;
       if (rawExpected.length !== 64 || !/^[0-9a-f]+$/i.test(rawExpected)) {
-        // Sinon, on calcule son hash pour comparer deux empreintes SHA-256
         expectedHash = await hashString(rawExpected);
       }
-    
+
       if (inputHash.toLowerCase() === expectedHash.toLowerCase()) {
         currentRole = selectedRole;
         localStorage.setItem('user_role', currentRole);
@@ -330,7 +355,12 @@
       const tokenParam = urlParams.get('token');
       const tokenHash = tokenParam ? await hashString(tokenParam) : "";
 
-      if (isQuickAdd && tokenHash && ACTUAL_QUICK_HASH && tokenHash === ACTUAL_QUICK_HASH) {
+      let expectedTokenHash = ACTUAL_QUICK_HASH;
+      if (ACTUAL_QUICK_HASH && (ACTUAL_QUICK_HASH.length !== 64 || !/^[0-9a-f]+$/i.test(ACTUAL_QUICK_HASH))) {
+        expectedTokenHash = await hashString(ACTUAL_QUICK_HASH);
+      }
+
+      if (isQuickAdd && tokenHash && expectedTokenHash && tokenHash.toLowerCase() === expectedTokenHash.toLowerCase()) {
         currentRole = 'admin';
         localStorage.setItem('user_role', 'admin');
         unlockQuickAddMode();
@@ -744,7 +774,6 @@
         currentProductsMap[product.id] = product;
         const isGuest = currentRole === 'guest';
         
-        // Calcul des quantités
         const requested = product.quantity_requested || 1;
         const boughtList = Array.isArray(product.bought_by_list) ? product.bought_by_list : [];
         const totalBought = boughtList.reduce((sum, item) => sum + (parseInt(item.qty) || 0), 0);
@@ -754,7 +783,6 @@
         const showBoughtToGuest = isGuest && isFullyBought;
         const showBoughtToAdmin = !isGuest && !isListHiddenFromAdmin && totalBought > 0;
 
-        // Liste textuelle des acheteurs pour l'Admin
         const buyersDetail = boughtList.map(b => `${b.name} (${b.qty})`).join(', ');
 
         const card = document.createElement('div');
@@ -767,7 +795,6 @@
                    onerror="this.onerror=null; this.src='https://images.weserv.nl/?url=' + encodeURIComponent('${product.image_url}');"
                    class="w-full h-full object-contain p-2">
               
-              <!-- Badges d'état -->
               ${showBoughtToGuest ? `<span class="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded font-bold">🎁 Totalement réservé</span>` : ''}
               ${showBoughtToAdmin ? `<span class="absolute top-2 left-2 bg-emerald-600 text-white text-xs px-2 py-1 rounded font-bold">✓ ${totalBought}/${requested} réservé(s)</span>` : ''}
               
@@ -891,32 +918,61 @@
       }
     }
 
-    async function markAsBought(id, maxAvailable) {
+    function markAsBought(id, maxAvailable) {
       if (currentRole === 'admin') return alert("L'administrateur ne peut pas réserver les articles de sa propre liste !");
       if (!supabaseClient) return;
 
       const product = currentProductsMap[id];
       if (!product) return;
 
-      const name = prompt("Votre prénom pour réserver ce cadeau :");
-      if (!name || !name.trim()) return;
+      document.getElementById('buyProductId').value = id;
+      document.getElementById('buyMaxQty').value = maxAvailable;
+      document.getElementById('buyerNameInput').value = '';
+      
+      const qtyInput = document.getElementById('buyerQtyInput');
+      const qtyContainer = document.getElementById('buyQtyContainer');
+      
+      qtyInput.value = 1;
+      qtyInput.max = maxAvailable;
 
-      let qtyToBuy = 1;
       if (maxAvailable > 1) {
-        const qtyInput = prompt(`Combien d'exemplaires souhaitez-vous offrir ? (1 à ${maxAvailable}) :`, "1");
-        if (!qtyInput) return;
-        qtyToBuy = parseInt(qtyInput);
-
-        if (isNaN(qtyToBuy) || qtyToBuy < 1 || qtyToBuy > maxAvailable) {
-          return alert(`⚠️ Veuillez entrer un chiffre valide entre 1 et ${maxAvailable}.`);
-        }
+        document.getElementById('buyQtyLabel').innerText = `Quantité à offrir (1 à ${maxAvailable}) :`;
+        qtyContainer.classList.remove('hidden');
+      } else {
+        qtyContainer.classList.add('hidden');
       }
+
+      document.getElementById('buyModal').classList.remove('hidden');
+      setTimeout(() => document.getElementById('buyerNameInput').focus(), 100);
+    }
+
+    function closeBuyModal() {
+      document.getElementById('buyModal').classList.add('hidden');
+    }
+
+    async function confirmBuy() {
+      const id = document.getElementById('buyProductId').value;
+      const maxAvailable = parseInt(document.getElementById('buyMaxQty').value) || 1;
+      const name = document.getElementById('buyerNameInput').value.trim();
+      let qtyToBuy = parseInt(document.getElementById('buyerQtyInput').value) || 1;
+
+      if (!name) return alert("Veuillez entrer votre prénom.");
+
+      if (maxAvailable > 1) {
+        if (isNaN(qtyToBuy) || qtyToBuy < 1 || qtyToBuy > maxAvailable) {
+          return alert(`⚠️ Veuillez choisir une quantité entre 1 et ${maxAvailable}.`);
+        }
+      } else {
+        qtyToBuy = 1;
+      }
+
+      const product = currentProductsMap[id];
+      if (!product) return;
 
       const existingList = Array.isArray(product.bought_by_list) ? [...product.bought_by_list] : [];
       
-      // Ajout du nouvel acheteur dans le tableau JSON
       existingList.push({
-        name: name.trim(),
+        name: name,
         qty: qtyToBuy,
         date: new Date().toISOString()
       });
@@ -928,7 +984,7 @@
         .from('products')
         .update({
           is_bought: isFullyBought,
-          bought_by: name.trim(), // fallback rétrocompatible
+          bought_by: name,
           bought_by_list: existingList
         })
         .eq('id', id);
@@ -936,6 +992,7 @@
       if (error) {
         alert("Erreur lors de la réservation : " + error.message);
       } else {
+        closeBuyModal();
         loadProducts();
       }
     }
@@ -950,7 +1007,6 @@
       if (boughtList.length === 0) return alert("Aucune réservation trouvée.");
 
       if (isAdminForce) {
-        // Mode Administrateur : choix de la réservation à supprimer
         const summary = boughtList.map((b, idx) => `${idx + 1}. ${b.name} (${b.qty} ex.)`).join('\n');
         const choiceIndex = prompt(`Sélectionnez le numéro de la réservation à annuler :\n\n${summary}`);
         if (!choiceIndex) return;
@@ -960,7 +1016,6 @@
 
         boughtList.splice(idx, 1);
       } else {
-        // Mode Visiteur : Vérification du prénom pour retirer sa réservation
         const inputName = prompt("Entrez le prénom utilisé lors de la réservation pour l'annuler :");
         if (!inputName || !inputName.trim()) return;
 
