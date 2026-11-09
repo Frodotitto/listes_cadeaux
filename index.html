@@ -14,7 +14,7 @@
     <div class="bg-white p-6 rounded-2xl shadow-2xl max-w-sm w-full text-center relative z-10">
       <div id="roleSelectionStep">
         <h2 class="text-2xl font-extrabold mb-2 text-indigo-600">Listes Cadeaux 🎁</h2>
-        <p class="text-xs text-slate-500 mb-6">Connexion</p>
+        <p class="text-xs text-slate-500 mb-6">Comment souhaitez-vous vous connecter ?</p>
         <div class="flex flex-col gap-3">
           <button type="button" onclick="selectRole('guest')" class="w-full bg-indigo-50 border-2 border-indigo-200 hover:bg-indigo-100 text-indigo-700 py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 cursor-pointer">
             <span>👥 Famille</span>
@@ -97,6 +97,10 @@
           <input type="text" id="editProductStore" class="w-full p-2 border rounded-lg text-sm">
         </div>
         <div>
+          <label class="block text-xs font-semibold text-slate-500 mb-1">Quantité souhaitée :</label>
+          <input type="number" id="editProductQuantity" min="1" value="1" class="w-full p-2 border rounded-lg text-sm">
+        </div>
+        <div class="md:col-span-2">
           <label class="block text-xs font-semibold text-slate-500 mb-1">Liste :</label>
           <select id="editProductListSelect" class="w-full p-2 border rounded-lg text-sm bg-white"></select>
         </div>
@@ -150,8 +154,12 @@
       </div>
       <p id="fetchStatus" class="text-xs text-indigo-600 mb-3 h-4"></p>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        <input type="text" id="productTitle" placeholder="Titre du produit" class="p-2 border rounded-lg text-sm">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <input type="text" id="productTitle" placeholder="Titre du produit" class="p-2 border rounded-lg text-sm md:col-span-2">
+        <div>
+          <label class="block text-[10px] font-semibold text-slate-400 mb-0.5">Quantité :</label>
+          <input type="number" id="productQuantity" min="1" value="1" placeholder="Qté" class="w-full p-2 border rounded-lg text-sm">
+        </div>
         <input type="text" id="productPrice" placeholder="Prix (ex: 49.99 €)" class="p-2 border rounded-lg text-sm">
         <input type="text" id="productStore" placeholder="Marchand (ex: Fnac)" class="p-2 border rounded-lg text-sm">
         <input type="url" id="productImage" placeholder="URL de l'image" class="p-2 border rounded-lg text-sm">
@@ -217,10 +225,10 @@
 
       if (role === 'guest') {
         document.getElementById('passwordTitle').innerText = "Accès Famille";
-        document.getElementById('passwordSubtitle').innerText = "Entrer le mot de passe reçu pour consulter les listes.";
+        document.getElementById('passwordSubtitle').innerText = "Entrez le mot de passe reçu pour consulter les listes.";
       } else {
         document.getElementById('passwordTitle').innerText = "Accès Administrateur";
-        document.getElementById('passwordSubtitle').innerText = "Entrer le mot de passe administrateur pour gérer les articles.";
+        document.getElementById('passwordSubtitle').innerText = "Entrez votre mot de passe administrateur pour gérer les articles.";
       }
       setTimeout(() => document.getElementById('passInput')?.focus(), 100);
     }
@@ -365,6 +373,7 @@
             if (parsed.image) document.getElementById('productImage').value = parsed.image;
             if (parsed.store) document.getElementById('productStore').value = parsed.store;
             if (parsed.comment) document.getElementById('productComment').value = parsed.comment;
+            if (parsed.quantity) document.getElementById('productQuantity').value = parseInt(parsed.quantity) || 1;
     
             if (parsed.list_id) {
               currentListId = parseInt(parsed.list_id);
@@ -649,6 +658,7 @@
       const title = document.getElementById('productTitle').value;
       const url = document.getElementById('productUrl').value;
       const list_id = document.getElementById('formListSelect').value;
+      const quantity_requested = parseInt(document.getElementById('productQuantity').value) || 1;
 
       if (!title || !url || !list_id) return alert("Champs obligatoires manquants.");
 
@@ -669,8 +679,10 @@
         store_name: document.getElementById('productStore').value || 'Boutique',
         price: document.getElementById('productPrice').value || 'Non renseigné',
         comment: document.getElementById('productComment').value || '',
+        quantity_requested: quantity_requested,
         list_id: parseInt(list_id),
-        is_bought: false
+        is_bought: false,
+        bought_by_list: []
       }]);
 
       if (error) {
@@ -682,6 +694,7 @@
         } else {
           const fields = ['productUrl', 'productTitle', 'productPrice', 'productStore', 'productImage', 'productComment'];
           fields.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+          document.getElementById('productQuantity').value = 1;
           document.getElementById('fetchStatus').innerText = '';
           window.history.replaceState({}, document.title, window.location.pathname);
           selectList(parseInt(list_id));
@@ -716,8 +729,18 @@
         currentProductsMap[product.id] = product;
         const isGuest = currentRole === 'guest';
         
-        const showBoughtToGuest = isGuest && product.is_bought;
-        const showBoughtToAdmin = !isGuest && !isListHiddenFromAdmin && product.is_bought;
+        // Calcul des quantités
+        const requested = product.quantity_requested || 1;
+        const boughtList = Array.isArray(product.bought_by_list) ? product.bought_by_list : [];
+        const totalBought = boughtList.reduce((sum, item) => sum + (parseInt(item.qty) || 0), 0);
+        const remaining = Math.max(0, requested - totalBought);
+        const isFullyBought = remaining === 0;
+
+        const showBoughtToGuest = isGuest && isFullyBought;
+        const showBoughtToAdmin = !isGuest && !isListHiddenFromAdmin && totalBought > 0;
+
+        // Liste textuelle des acheteurs pour l'Admin
+        const buyersDetail = boughtList.map(b => `${b.name} (${b.qty})`).join(', ');
 
         const card = document.createElement('div');
         card.className = `bg-white rounded-xl shadow-sm border overflow-hidden flex flex-col justify-between ${showBoughtToGuest ? 'opacity-60 bg-slate-100' : ''}`;
@@ -728,8 +751,11 @@
                    referrerpolicy="no-referrer"
                    onerror="this.onerror=null; this.src='https://images.weserv.nl/?url=' + encodeURIComponent('${product.image_url}');"
                    class="w-full h-full object-contain p-2">
-              ${showBoughtToGuest ? `<span class="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded font-bold">🎁 Déjà réservé</span>` : ''}
-              ${showBoughtToAdmin ? `<span class="absolute top-2 left-2 bg-emerald-600 text-white text-xs px-2 py-1 rounded font-bold">✓ Réservé (${product.bought_by})</span>` : ''}
+              
+              <!-- Badges d'état -->
+              ${showBoughtToGuest ? `<span class="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded font-bold">🎁 Totalement réservé</span>` : ''}
+              ${showBoughtToAdmin ? `<span class="absolute top-2 left-2 bg-emerald-600 text-white text-xs px-2 py-1 rounded font-bold">✓ ${totalBought}/${requested} réservé(s)</span>` : ''}
+              
               ${currentRole === 'admin' ? `
                 <div class="absolute top-2 right-2 flex gap-1">
                   <button type="button" onclick="openEditModal(${product.id})" class="bg-slate-800 bg-opacity-70 text-white p-1.5 rounded-full hover:bg-indigo-600 transition text-xs cursor-pointer">✏️</button>
@@ -738,7 +764,10 @@
               ` : ''}
             </div>
             <div class="p-4">
-              <span class="text-xs font-semibold text-indigo-500 uppercase tracking-wider">${product.store_name}</span>
+              <div class="flex justify-between items-start">
+                <span class="text-xs font-semibold text-indigo-500 uppercase tracking-wider">${product.store_name}</span>
+                <span class="text-xs font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full">Quantité : ${requested}</span>
+              </div>
               <h3 class="font-bold text-slate-800 text-base line-clamp-2 mt-1">${product.title}</h3>
               <p class="text-lg font-extrabold text-slate-900 mt-2">${product.price}</p>
               ${product.comment ? `<p class="mt-2 text-xs text-slate-600 bg-amber-50 border border-amber-200 p-2 rounded-lg italic">💬 ${product.comment}</p>` : ''}
@@ -747,32 +776,43 @@
           <div class="p-4 border-t bg-slate-50 flex flex-col gap-2">
             <a href="${product.url}" target="_blank" class="text-center text-xs text-indigo-600 hover:underline">Voir l'article d'origine ↗</a>
             <a href="https://www.google.com/search?tbm=shop&q=${encodeURIComponent(product.title)}" target="_blank" class="text-center text-xs text-slate-500 hover:underline">🔍 Comparer les prix</a>
+            
             ${currentRole === 'admin' ? (
               isListHiddenFromAdmin ? `
                 <div class="text-center text-xs text-indigo-600 bg-indigo-50 font-medium py-2 rounded-lg border border-indigo-100">
                   🔒 Statut d'achat masqué pour garder la surprise !
                 </div>
-              ` : product.is_bought ? `
+              ` : totalBought > 0 ? `
                 <div class="text-center text-xs text-emerald-700 bg-emerald-50 font-bold py-2 rounded-lg border border-emerald-200 flex flex-col gap-1">
-                  <span>✓ Réservé par ${product.bought_by || 'un proche'}</span>
-                  <button type="button" onclick="cancelBought(${product.id}, true)" class="text-[10px] text-red-500 hover:underline font-normal cursor-pointer">Annuler la réservation</button>
+                  <span>✓ ${totalBought}/${requested} réservé(s) par ${buyersDetail}</span>
+                  <button type="button" onclick="cancelBought(${product.id}, true)" class="text-[10px] text-red-500 hover:underline font-normal cursor-pointer">Gérer / Annuler les réservations</button>
                 </div>
               ` : `
                 <div class="text-center text-xs text-slate-500 bg-slate-100 py-2 rounded-lg border">
-                  Disponible
+                  Disponible (${requested} souhaité(s))
                 </div>
               `
-            ) : product.is_bought ? `
+            ) : isFullyBought ? `
               <div class="flex flex-col gap-1">
                 <div class="text-center text-xs text-red-600 bg-red-50 font-bold py-2 rounded-lg border border-red-100">
-                  🎁 Déjà réservé
+                  🎁 Déjà totalement réservé (${totalBought}/${requested})
                 </div>
                 <button type="button" onclick="cancelBought(${product.id})" class="text-[11px] text-slate-400 hover:text-red-500 underline text-center cursor-pointer">
-                  C'est une erreur ? Annuler la réservation
+                  C'est une erreur ? Annuler ma réservation
                 </button>
               </div>
             ` : `
-              <button type="button" onclick="markAsBought(${product.id})" class="w-full bg-emerald-600 text-white text-xs font-bold py-2 rounded hover:bg-emerald-700 transition cursor-pointer">Offrir cet article</button>
+              <div class="flex flex-col gap-2">
+                <div class="flex justify-between items-center text-xs text-slate-600 font-medium px-1">
+                  <span>Encore ${remaining} disponible(s) sur ${requested}</span>
+                </div>
+                ${totalBought > 0 ? `
+                  <button type="button" onclick="cancelBought(${product.id})" class="text-[10px] text-slate-400 hover:text-red-500 underline text-right cursor-pointer">
+                    Annuler ma précédente réservation
+                  </button>
+                ` : ''}
+                <button type="button" onclick="markAsBought(${product.id}, ${remaining})" class="w-full bg-emerald-600 text-white text-xs font-bold py-2 rounded hover:bg-emerald-700 transition cursor-pointer">Offrir cet article</button>
+              </div>
             `}
           </div>
         `;
@@ -791,6 +831,7 @@
       document.getElementById('editProductUrl').value = product.url || '';
       document.getElementById('editProductImage').value = product.image_url || '';
       document.getElementById('editProductComment').value = product.comment || '';
+      document.getElementById('editProductQuantity').value = product.quantity_requested || 1;
       
       const select = document.getElementById('editProductListSelect');
       if (select) select.value = product.list_id;
@@ -812,12 +853,18 @@
       const url = document.getElementById('editProductUrl').value.trim();
       const image_url = document.getElementById('editProductImage').value.trim();
       const comment = document.getElementById('editProductComment').value.trim();
+      const quantity_requested = parseInt(document.getElementById('editProductQuantity').value) || 1;
       const list_id = parseInt(document.getElementById('editProductListSelect').value);
 
       if (!title || !url || !list_id) return alert("Champs obligatoires manquants.");
 
+      const product = currentProductsMap[id];
+      const boughtList = Array.isArray(product?.bought_by_list) ? product.bought_by_list : [];
+      const totalBought = boughtList.reduce((sum, item) => sum + (parseInt(item.qty) || 0), 0);
+      const is_bought = totalBought >= quantity_requested;
+
       const { error } = await supabaseClient.from('products').update({
-        title, price, store_name, url, image_url, comment, list_id
+        title, price, store_name, url, image_url, comment, quantity_requested, list_id, is_bought
       }).eq('id', id);
 
       if (error) {
@@ -829,35 +876,101 @@
       }
     }
 
-    async function markAsBought(id) {
+    async function markAsBought(id, maxAvailable) {
       if (currentRole === 'admin') return alert("L'administrateur ne peut pas réserver les articles de sa propre liste !");
       if (!supabaseClient) return;
+
+      const product = currentProductsMap[id];
+      if (!product) return;
+
       const name = prompt("Votre prénom pour réserver ce cadeau :");
-      if (!name) return;
-      await supabaseClient.from('products').update({ is_bought: true, bought_by: name.trim() }).eq('id', id);
-      loadProducts();
+      if (!name || !name.trim()) return;
+
+      let qtyToBuy = 1;
+      if (maxAvailable > 1) {
+        const qtyInput = prompt(`Combien d'exemplaires souhaitez-vous offrir ? (1 à ${maxAvailable}) :`, "1");
+        if (!qtyInput) return;
+        qtyToBuy = parseInt(qtyInput);
+
+        if (isNaN(qtyToBuy) || qtyToBuy < 1 || qtyToBuy > maxAvailable) {
+          return alert(`⚠️ Veuillez entrer un chiffre valide entre 1 et ${maxAvailable}.`);
+        }
+      }
+
+      const existingList = Array.isArray(product.bought_by_list) ? [...product.bought_by_list] : [];
+      
+      // Ajout du nouvel acheteur dans le tableau JSON
+      existingList.push({
+        name: name.trim(),
+        qty: qtyToBuy,
+        date: new Date().toISOString()
+      });
+
+      const newTotalBought = existingList.reduce((sum, item) => sum + (parseInt(item.qty) || 0), 0);
+      const isFullyBought = newTotalBought >= (product.quantity_requested || 1);
+
+      const { error } = await supabaseClient
+        .from('products')
+        .update({
+          is_bought: isFullyBought,
+          bought_by: name.trim(), // fallback rétrocompatible
+          bought_by_list: existingList
+        })
+        .eq('id', id);
+
+      if (error) {
+        alert("Erreur lors de la réservation : " + error.message);
+      } else {
+        loadProducts();
+      }
     }
 
     async function cancelBought(id, isAdminForce = false) {
       if (!supabaseClient) return;
 
       const product = currentProductsMap[id];
-      if (!product || !product.is_bought) return;
+      if (!product) return;
 
-      if (!isAdminForce) {
-        const inputName = prompt("Entrer le prénom utilisé lors de la réservation pour l'annuler :");
-        if (!inputName) return;
+      let boughtList = Array.isArray(product.bought_by_list) ? [...product.bought_by_list] : [];
+      if (boughtList.length === 0) return alert("Aucune réservation trouvée.");
 
-        if (inputName.trim().toLowerCase() !== (product.bought_by || '').trim().toLowerCase()) {
-          return alert("⚠️ Le prénom ne correspond pas à celui utilisé lors de la réservation.");
-        }
+      if (isAdminForce) {
+        // Mode Administrateur : choix de la réservation à supprimer
+        const summary = boughtList.map((b, idx) => `${idx + 1}. ${b.name} (${b.qty} ex.)`).join('\n');
+        const choiceIndex = prompt(`Sélectionnez le numéro de la réservation à annuler :\n\n${summary}`);
+        if (!choiceIndex) return;
+
+        const idx = parseInt(choiceIndex) - 1;
+        if (isNaN(idx) || idx < 0 || idx >= boughtList.length) return alert("Numéro invalide.");
+
+        boughtList.splice(idx, 1);
       } else {
-        if (!confirm(`Annuler la réservation de ${product.bought_by || 'cet acheteur'} ?`)) return;
+        // Mode Visiteur : Vérification du prénom pour retirer sa réservation
+        const inputName = prompt("Entrez le prénom utilisé lors de la réservation pour l'annuler :");
+        if (!inputName || !inputName.trim()) return;
+
+        const nameClean = inputName.trim().toLowerCase();
+        const foundIndex = boughtList.findIndex(b => b.name.trim().toLowerCase() === nameClean);
+
+        if (foundIndex === -1) {
+          return alert("⚠️ Aucune réservation trouvée à ce prénom sur cet article.");
+        }
+
+        boughtList.splice(foundIndex, 1);
       }
+
+      const newTotalBought = boughtList.reduce((sum, item) => sum + (parseInt(item.qty) || 0), 0);
+      const requested = product.quantity_requested || 1;
+      const isFullyBought = newTotalBought >= requested;
+      const lastBuyer = boughtList.length > 0 ? boughtList[boughtList.length - 1].name : null;
 
       const { error } = await supabaseClient
         .from('products')
-        .update({ is_bought: false, bought_by: null })
+        .update({
+          is_bought: isFullyBought,
+          bought_by: lastBuyer,
+          bought_by_list: boughtList
+        })
         .eq('id', id);
 
       if (error) {
