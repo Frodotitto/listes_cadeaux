@@ -35,6 +35,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const url = document.getElementById('url').value.trim();
     const comment = document.getElementById('comment').value.trim();
     const list_id = document.getElementById('listSelect').value;
+    
+    // Récupération de la quantité (valeur par défaut : 1)
+    const quantityInput = document.getElementById('quantity');
+    const quantity_requested = quantityInput ? (parseInt(quantityInput.value) || 1) : 1;
 
     if (!title || !url || !list_id) {
       statusEl.innerText = '⚠️ Titre, URL et Liste obligatoires.';
@@ -69,7 +73,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
       }
 
-      // Insertion du produit
+      // Insertion du produit avec quantité et liste d'acheteurs vide
       const insertRes = await fetch(`${cleanUrl}/rest/v1/products`, {
         method: 'POST',
         headers: {
@@ -85,8 +89,10 @@ document.addEventListener('DOMContentLoaded', async () => {
           store_name: store || 'Boutique',
           price: price || 'Non renseigné',
           comment: comment || '',
+          quantity_requested: quantity_requested,
           list_id: parseInt(list_id),
-          is_bought: false
+          is_bought: false,
+          bought_by_list: []
         })
       });
 
@@ -118,7 +124,8 @@ async function loadLists() {
   try {
     const cleanUrl = SUPABASE_URL.replace(/\/$/, '');
     
-    const response = await fetch(`${cleanUrl}/rest/v1/lists?select=id,name&order=id.asc`, {
+    // Essai de tri par la colonne position
+    let response = await fetch(`${cleanUrl}/rest/v1/lists?select=id,name,position&order=position.asc`, {
       method: 'GET',
       headers: {
         'apikey': SUPABASE_KEY,
@@ -126,6 +133,18 @@ async function loadLists() {
         'Content-Type': 'application/json'
       }
     });
+
+    // Fallback sur le tri par ID si la colonne position n'existe pas
+    if (!response.ok) {
+      response = await fetch(`${cleanUrl}/rest/v1/lists?select=id,name&order=id.asc`, {
+        method: 'GET',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+    }
 
     if (!response.ok) throw new Error(`Erreur HTTP: ${response.status}`);
 
@@ -138,7 +157,6 @@ async function loadLists() {
         const opt = document.createElement('option');
         opt.value = l.id;
         opt.innerText = l.name;
-        // Sélectionne automatiquement la dernière liste utilisée si elle existe
         if (lastSavedListId && String(l.id) === String(lastSavedListId)) {
           opt.selected = true;
         }
