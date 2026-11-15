@@ -45,7 +45,13 @@ jobs:
               return str ? crypto.createHash("sha256").update(str.trim()).digest("hex") : "";
             }
 
+            console.log("SUPABASE_URL présent :", !!process.env.SUPABASE_URL);
+            console.log("ADMIN_PASSWORD présent :", !!process.env.ADMIN_PASSWORD);
+            console.log("GUEST_PASSWORD présent :", !!process.env.GUEST_PASSWORD);
+
             let content = fs.readFileSync("index.html", "utf8");
+            console.log("Marqueur __ADMIN_PASSWORD__ trouvé :", content.includes("__ADMIN_PASSWORD__"));
+
             content = content.split("__SUPABASE_URL__").join(process.env.SUPABASE_URL || "");
             content = content.split("__SUPABASE_KEY__").join(process.env.SUPABASE_KEY || "");
             content = content.split("__GUEST_PASSWORD__").join(hash(process.env.GUEST_PASSWORD));
