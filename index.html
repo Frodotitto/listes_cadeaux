@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Listes Cadeaux 🎁</title>
+  <link id="appleTouchIcon" rel="apple-touch-icon" sizes="180x180" href="">
+  <link id="favIcon" rel="icon" type="image/png" href="">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -206,6 +208,63 @@
   </main>
 
   <script>
+    // Génération d'une icône haute définition (180x180) pour iOS & navigateurs
+    (function generateAppIcon() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 180;
+      canvas.height = 180;
+      const ctx = canvas.getContext('2d');
+
+      // Fond dégradé Indigo -> Violet
+      const grad = ctx.createLinearGradient(0, 0, 180, 180);
+      grad.addColorStop(0, '#4f46e5');
+      grad.addColorStop(1, '#7c3aed');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 180, 180);
+
+      // Halo lumineux subtil au centre
+      const radial = ctx.createRadialGradient(90, 90, 10, 90, 90, 85);
+      radial.addColorStop(0, 'rgba(255, 255, 255, 0.22)');
+      radial.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      ctx.fillStyle = radial;
+      ctx.fillRect(0, 0, 180, 180);
+
+      // Dessin de la boîte cadeau blanche minimaliste
+      ctx.fillStyle = '#ffffff';
+      // Corps de la boîte
+      ctx.beginPath();
+      ctx.roundRect(46, 78, 88, 62, 10);
+      ctx.fill();
+
+      // Couvercle
+      ctx.beginPath();
+      ctx.roundRect(40, 62, 100, 18, 6);
+      ctx.fill();
+
+      // Ruban vertical (couleur dorée/ambre)
+      ctx.fillStyle = '#fbbf24';
+      ctx.fillRect(83, 62, 14, 78);
+
+      // Nœud du ruban (boucles gauche et droite)
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 8;
+      ctx.lineCap = 'round';
+      
+      ctx.beginPath();
+      ctx.ellipse(73, 50, 15, 10, -0.3, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.ellipse(107, 50, 15, 10, 0.3, 0, Math.PI * 2);
+      ctx.stroke();
+
+      const pngDataUrl = canvas.toDataURL('image/png');
+      const appleIcon = document.getElementById('appleTouchIcon');
+      const favIcon = document.getElementById('favIcon');
+      if (appleIcon) appleIcon.href = pngDataUrl;
+      if (favIcon) favIcon.href = pngDataUrl;
+    })();
+    
     const SUPABASE_URL = "__SUPABASE_URL__";
     const SUPABASE_KEY = "__SUPABASE_KEY__";
     const ACCESS_CODE_GUEST_HASH = "__GUEST_PASSWORD__";
