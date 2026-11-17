@@ -1078,7 +1078,7 @@
 
         const card = document.createElement('div');
         card.className = `bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col justify-between transition-colors ${showBoughtToGuest ? 'opacity-65 bg-slate-100 dark:bg-slate-900/50' : ''}`;
-        card.innerHTML = `
+card.innerHTML = `
           <div>
             <div class="h-48 overflow-hidden bg-slate-100 dark:bg-slate-800/70 relative">
               <img src="${product.image_url}" alt="${product.title}" 
@@ -1101,14 +1101,17 @@
                 <span class="text-xs font-semibold text-indigo-500 dark:text-indigo-400 uppercase tracking-wider">${product.store_name}</span>
                 <span class="text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-full shrink-0">Quantité : ${requested}</span>
               </div>
-              <h3 class="font-bold text-slate-800 dark:text-slate-100 text-base line-clamp-2 mt-1">${product.title}</h3>
+              <h3 class="font-bold text-slate-800 dark:text-slate-100 text-base line-clamp-2 mt-1">
+                <a href="${product.url}" target="_blank" rel="noopener noreferrer" class="hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline transition">
+                  ${product.title} <span class="text-xs font-normal text-indigo-500 dark:text-indigo-400">↗</span>
+                </a>
+              </h3>
               <p class="text-lg font-extrabold text-slate-900 dark:text-white mt-2">${product.price}</p>
               ${product.comment ? `<p class="mt-2 text-xs text-slate-600 dark:text-amber-200/90 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 p-2 rounded-lg italic">💬 ${product.comment}</p>` : ''}
             </div>
           </div>
           <div class="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 flex flex-col gap-2">
-            <a href="${product.url}" target="_blank" class="text-center text-xs text-indigo-600 dark:text-indigo-400 hover:underline">Voir l'article d'origine ↗</a>
-            <a href="https://www.google.com/search?tbm=shop&q=${encodeURIComponent(product.title)}" target="_blank" class="text-center text-xs text-slate-500 dark:text-slate-400 hover:underline">🔍 Comparer les prix</a>
+            <a href="https://www.google.com/search?tbm=shop&q=${encodeURIComponent(product.title)}" target="_blank" rel="noopener noreferrer" class="text-center text-xs text-slate-500 dark:text-slate-400 hover:underline">🔍 Comparer les prix</a>
             
             ${currentRole === 'admin' ? (
               isListHiddenFromAdmin ? `
