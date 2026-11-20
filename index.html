@@ -490,6 +490,7 @@
       localStorage.setItem('admin_seen_notifications', JSON.stringify(seenIds));
     }
 
+// --- Système de Notifications Administrateur (Synchronisé via Supabase) ---
     function toggleNotifications(e) {
       if (e) e.stopPropagation();
       const dropdown = document.getElementById('notifDropdown');
@@ -508,7 +509,6 @@
     async function loadAdminNotifications() {
       if (currentRole !== 'admin' || !supabaseClient) return;
 
-      // Filtrer uniquement les listes où le statut d'achat n'est PAS masqué
       const visibleLists = allLists.filter(l => !l.hide_status);
       const visibleListIds = visibleLists.map(l => l.id);
       const listNameById = {};
@@ -531,22 +531,22 @@
       products.forEach(prod => {
         const buyers = Array.isArray(prod.bought_by_list) ? prod.bought_by_list : [];
         buyers.forEach((b, idx) => {
-          const notifId = `${prod.id}_${b.name}_${b.date || idx}`;
           items.push({
-            id: notifId,
+            id: `${prod.id}_${idx}`,
             productId: prod.id,
+            buyerIndex: idx,
             productTitle: prod.title,
             productImage: prod.image_url || 'https://via.placeholder.com/100',
             listId: prod.list_id,
             listName: listNameById[prod.list_id] || 'Liste',
             buyerName: b.name || 'Un proche',
             qty: parseInt(b.qty) || 1,
-            date: b.date || null
+            date: b.date || null,
+            seen: !!b.seen
           });
         });
       });
 
-      // Tri du plus récent au plus ancien
       items.sort((a, b) => {
         if (!a.date && !b.date) return 0;
         if (!a.date) return 1;
@@ -564,8 +564,7 @@
       const markAllBtn = document.getElementById('markAllReadBtn');
       if (!badge || !listEl) return;
 
-      const seen = getSeenNotifications();
-      const unreadCount = adminNotifications.filter(n => !seen.includes(n.id)).length;
+      const unreadCount = adminNotifications.filter(n => !n.seen).length;
 
       if (unreadCount > 0) {
         badge.innerText = unreadCount > 99 ? '99+' : unreadCount;
@@ -582,13 +581,13 @@
       }
 
       listEl.innerHTML = adminNotifications.map(n => {
-        const isUnread = !seen.includes(n.id);
+        const isUnread = !n.seen;
         const formattedDate = n.date
           ? new Date(n.date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
           : '';
 
         return `
-          <div onclick="handleNotificationClick('${n.id}', ${n.listId})" class="p-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800/80 cursor-pointer transition flex items-center gap-3 ${isUnread ? 'bg-indigo-50/60 dark:bg-indigo-950/30' : ''}">
+          <div onclick="handleNotificationClick(${n.productId}, ${n.buyerIndex}, ${n.listId})" class="p-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800/80 cursor-pointer transition flex items-center gap-3 ${isUnread ? 'bg-indigo-50/60 dark:bg-indigo-950/30' : ''}">
             <span class="w-2 h-2 rounded-full shrink-0 ${isUnread ? 'bg-indigo-600 dark:bg-indigo-400' : 'bg-transparent'}"></span>
             <img src="${n.productImage}" alt=""
                  referrerpolicy="no-referrer"
@@ -608,24 +607,65 @@
       }).join('');
     }
 
-    function handleNotificationClick(notifId, listId) {
-      const seen = getSeenNotifications();
-      if (!seen.includes(notifId)) {
-        seen.push(notifId);
-        saveSeenNotifications(seen);
-        renderNotifications();
-      }
+    async function handleNotificationClick(productId, buyerIndex, listId) {
       document.getElementById('notifDropdown')?.classList.add('hidden');
       if (listId && listId !== currentListId) {
         selectList(listId);
       }
+
+      const notif = adminNotifications.find(n => n.productId === productId && n.buyerIndex === buyerIndex);
+      if (!notif || notif.seen || !supabaseClient) return;
+
+      notif.seen = true;
+      renderNotifications();
+
+      const { data: prod } = await supabaseClient
+        .from('products')
+        .select('bought_by_list')
+        .eq('id', productId)
+        .single();
+
+      if (prod && Array.isArray(prod.bought_by_list) && prod.bought_by_list[buyerIndex]) {
+        const updatedList = [...prod.bought_by_list];
+        updatedList[buyerIndex] = { ...updatedList[buyerIndex], seen: true };
+        await supabaseClient
+          .from('products')
+          .update({ bought_by_list: updatedList })
+          .eq('id', productId);
+      }
     }
 
-    function markAllNotificationsRead() {
-      const allIds = adminNotifications.map(n => n.id);
-      const merged = Array.from(new Set([...getSeenNotifications(), ...allIds]));
-      saveSeenNotifications(merged);
+    async function markAllNotificationsRead() {
+      if (!supabaseClient) return;
+
+      const unreadProductIds = Array.from(new Set(
+        adminNotifications.filter(n => !n.seen).map(n => n.productId)
+      ));
+
+      if (unreadProductIds.length === 0) return;
+
+      adminNotifications.forEach(n => { n.seen = true; });
       renderNotifications();
+
+      const { data: products } = await supabaseClient
+        .from('products')
+        .select('id, bought_by_list')
+        .in('id', unreadProductIds);
+
+      if (!products) return;
+
+      const updates = products.map(prod => {
+        const updatedList = (Array.isArray(prod.bought_by_list) ? prod.bought_by_list : []).map(entry => ({
+          ...entry,
+          seen: true
+        }));
+        return supabaseClient
+          .from('products')
+          .update({ bought_by_list: updatedList })
+          .eq('id', prod.id);
+      });
+
+      await Promise.all(updates);
     }
 
     window.addEventListener('DOMContentLoaded', async () => {
